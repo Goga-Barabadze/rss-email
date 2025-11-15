@@ -7,7 +7,6 @@ interface Env {
   MAILGUN_DOMAIN: string;
   MAILGUN_FROM: string;
   MAILGUN_RECIPIENT: string;
-  MANAGEMENT_API_KEY?: string;
 }
 
 interface StoredFeed extends FeedPageDataFeed {}
@@ -56,7 +55,6 @@ export default {
     }
 
     if (pathname === "/api/run" && request.method === "POST") {
-      await ensureAuthorized(request, env);
       const result = await processFeeds(env);
       return jsonResponse(result);
     }
@@ -66,7 +64,6 @@ export default {
       renderHtml({
         feeds,
         recipient: env.MAILGUN_RECIPIENT,
-        requiresAdminKey: Boolean(env.MANAGEMENT_API_KEY),
       }),
       {
         headers: {
@@ -83,10 +80,6 @@ export default {
 
 async function handleFeedApi(request: Request, env: Env, pathname: string) {
   const method = request.method.toUpperCase();
-
-  if (method !== "GET") {
-    await ensureAuthorized(request, env);
-  }
 
   if (method === "GET" && pathname === "/api/feeds") {
     const feeds = await listFeeds(env);
@@ -373,40 +366,6 @@ async function listFeeds(env: Env): Promise<StoredFeed[]> {
 
 async function saveFeeds(env: Env, feeds: StoredFeed[]) {
   await env.FEEDS_KV.put(FEEDS_KEY, JSON.stringify(feeds));
-}
-
-async function ensureAuthorized(request: Request, env: Env) {
-  const expectedKey = env.MANAGEMENT_API_KEY;
-  if (!expectedKey) {
-    return;
-  }
-
-  const provided =
-    request.headers.get("x-admin-key") ?? extractBearerToken(request);
-
-  if (!provided || provided !== expectedKey) {
-    throw new Response("Unauthorized", {
-      status: 401,
-      headers: {
-        "content-type": "text/plain",
-      },
-    });
-  }
-}
-
-function extractBearerToken(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!auth) return null;
-  const [scheme, token] = auth.split(" ");
-  if (!scheme || !token) return null;
-  if (scheme.toLowerCase() === "bearer") {
-    return token.trim();
-  }
-  if (scheme.toLowerCase() === "basic") {
-    const decoded = atob(token);
-    return decoded.split(":")[1];
-  }
-  return null;
 }
 
 async function readJson<T>(request: Request): Promise<T | null> {

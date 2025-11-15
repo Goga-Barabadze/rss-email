@@ -11,7 +11,6 @@ export interface FeedPageDataFeed {
 interface PageProps {
   feeds: FeedPageDataFeed[];
   recipient: string;
-  requiresAdminKey: boolean;
 }
 
 export function renderHtml({ feeds, recipient }: PageProps) {
@@ -251,7 +250,6 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           <h1>RSS → Mailgun</h1>
           <p class="subtext">New items land in <strong>${escapeHtml(recipient)}</strong>.</p>
         </div>
-        <button class="btn-ghost" id="change-key">Change key</button>
       </header>
 
       <div class="grid">
@@ -293,11 +291,6 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       };
 
       const toast = document.getElementById("toast");
-      const KEY_STORAGE = "rss-admin-key";
-      document.getElementById("change-key").addEventListener("click", () => {
-        localStorage.removeItem(KEY_STORAGE);
-        ensureAdminKey(true);
-      });
 
       document.getElementById("add-feed-form").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -307,7 +300,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           url: form.url.value,
         };
         try {
-          const response = await fetchWithAuth("/api/feeds", {
+          const response = await fetch("/api/feeds", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -326,7 +319,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         const statusEl = document.getElementById("run-status");
         statusEl.textContent = "Running job…";
         try {
-          const response = await fetchWithAuth("/api/run", { method: "POST" });
+          const response = await fetch("/api/run", { method: "POST" });
           if (!response.ok) throw await response.json();
           const data = await response.json();
           statusEl.textContent = data.message + " Checked " + data.feedsChecked + " feed(s).";
@@ -404,7 +397,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   payload[input.dataset.field] = input.value;
                 });
                 try {
-                  const response = await fetchWithAuth(\`/api/feeds/\${feed.id}\`, {
+                  const response = await fetch(\`/api/feeds/\${feed.id}\`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -419,7 +412,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               if (action === "delete") {
                 if (!confirm("Delete this feed?")) return;
                 try {
-                  const response = await fetchWithAuth(\`/api/feeds/\${feed.id}\`, {
+                  const response = await fetch(\`/api/feeds/\${feed.id}\`, {
                     method: "DELETE",
                   });
                   if (!response.ok) throw await response.json();
@@ -442,32 +435,6 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         } catch {
           return value;
         }
-      }
-
-      function ensureAdminKey(force = false) {
-        let key = localStorage.getItem(KEY_STORAGE);
-        if (!key || force) {
-          key = prompt("Enter MANAGEMENT_API_KEY value");
-          if (!key) {
-            showToast("Admin key required for this action.", true);
-            throw new Error("Admin key missing");
-          }
-          localStorage.setItem(KEY_STORAGE, key.trim());
-        }
-        return key.trim();
-      }
-
-      async function fetchWithAuth(url, init = {}) {
-        const headers = new Headers(init.headers || {});
-        const key = ensureAdminKey();
-        headers.set("X-Admin-Key", key);
-        const response = await fetch(url, { ...init, headers });
-        if (response.status === 401) {
-          localStorage.removeItem(KEY_STORAGE);
-          showToast("Admin key rejected. Please enter it again.", true);
-          throw new Error("Unauthorized");
-        }
-        return response;
       }
 
       function handleError(error, fallback) {

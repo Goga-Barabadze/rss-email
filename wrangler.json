@@ -9,8 +9,8 @@
   "kv_namespaces": [
     {
       "binding": "FEEDS_KV",
-      "id": "REPLACE_WITH_PRODUCTION_KV_ID",
-      "preview_id": "REPLACE_WITH_PREVIEW_KV_ID"
+      "id": "b86aaae787ec4274a5a6d8ca82bc075c",
+      "preview_id": "3195e4b6cd5940258a989c34d1e2249b"
     }
   ],
   "d1_databases": [

@@ -1,3 +1,4 @@
+import { XMLParser } from "fast-xml-parser";
 import { renderHtml, type FeedPageDataFeed } from "./renderHtml";
 
 interface Env {
@@ -239,46 +240,63 @@ async function fetchFeedItems(url: string): Promise<ParsedItem[]> {
     throw new Error(`Fetch failed (${response.status})`);
   }
   const text = await response.text();
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, "application/xml");
+  return parseFeed(text, url);
+}
 
-  if (doc.querySelector("parsererror")) {
-    throw new Error("Invalid RSS/Atom feed");
+function parseFeed(xml: string, fallbackUrl: string): ParsedItem[] {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+    allowBooleanAttributes: true,
+  });
+
+  let doc: any;
+  try {
+    doc = parser.parse(xml);
+  } catch (error) {
+    throw new Error(
+      `Invalid RSS/Atom feed: ${error instanceof Error ? error.message : "parse failure"}`,
+    );
   }
 
   const items: ParsedItem[] = [];
-  const rssItems = [...doc.querySelectorAll("item")];
-  const atomEntries = [...doc.querySelectorAll("entry")];
+  const rssItems = toArray(doc?.rss?.channel?.item);
+  const atomEntries = toArray(doc?.feed?.entry);
 
-  for (const node of rssItems) {
+  for (const item of rssItems) {
+    const id = item?.guid?.["#text"] ?? item?.guid ?? item?.link ?? item?.title;
     items.push({
-      id:
-        getText(node, "guid") ??
-        getText(node, "link") ??
-        getText(node, "title") ??
-        crypto.randomUUID(),
-      title: getText(node, "title") ?? "Untitled item",
-      link: getText(node, "link") ?? url,
-      summary: getText(node, "description") ?? undefined,
-      published: getText(node, "pubDate") ?? undefined,
+      id: id ?? crypto.randomUUID(),
+      title: item?.title ?? "Untitled item",
+      link: item?.link ?? fallbackUrl,
+      summary: item?.description ?? undefined,
+      published: item?.pubDate ?? undefined,
     });
   }
 
-  for (const node of atomEntries) {
-    const link =
-      node.querySelector("link")?.getAttribute("href") ??
-      getText(node, "id") ??
-      url;
+  for (const entry of atomEntries) {
+    const link = Array.isArray(entry?.link)
+      ? entry.link.find((l: any) => l.rel === "alternate")?.href ??
+        entry.link[0]?.href
+      : entry?.link?.href ?? entry?.link;
+    const id = entry?.id ?? link ?? entry?.title;
     items.push({
-      id: getText(node, "id") ?? link ?? crypto.randomUUID(),
-      title: getText(node, "title") ?? "Untitled entry",
-      link: link ?? url,
-      summary: getText(node, "summary") ?? undefined,
-      published: getText(node, "updated") ?? getText(node, "published") ?? undefined,
+      id: id ?? crypto.randomUUID(),
+      title: entry?.title ?? "Untitled entry",
+      link: link ?? fallbackUrl,
+      summary: entry?.summary ?? entry?.content ?? undefined,
+      published: entry?.updated ?? entry?.published ?? undefined,
     });
   }
 
   return items;
+}
+
+function toArray<T>(value: T | T[] | undefined | null): T[] {
+  if (!value) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
 }
 
 async function sendDigestEmail(env: Env, jobs: FeedJobItem[]) {
@@ -426,10 +444,6 @@ async function hashIdentifier(input: string) {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-}
-
-function getText(node: Element, selector: string) {
-  return node.querySelector(selector)?.textContent?.trim() ?? null;
 }
 
 function truncate(text: string, length: number) {

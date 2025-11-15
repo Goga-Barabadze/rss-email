@@ -14,7 +14,7 @@ interface PageProps {
   requiresAdminKey: boolean;
 }
 
-export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
+export function renderHtml({ feeds, recipient }: PageProps) {
   const initialFeeds = JSON.stringify(feeds).replace(/</g, "\\u003c");
   return `
 <!DOCTYPE html>
@@ -28,178 +28,275 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
     <style>
       :root {
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #111827;
-        background: #f8fafc;
+        color: #0f172a;
+        background: #030712;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
-        padding: 2rem;
+        min-height: 100vh;
+        background: radial-gradient(circle at 10% 20%, #111827 0%, #030712 60%);
+        color: inherit;
       }
-      h1, h2, h3, h4 {
-        margin: 0 0 0.5rem 0;
-      }
-      p {
-        margin: 0.25rem 0 1rem;
+      .app-shell {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: clamp(1.5rem, 2.5vw, 3rem);
       }
       header {
         display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
         margin-bottom: 2rem;
       }
-      .card {
-        background: #fff;
-        border-radius: 1rem;
+      .hero {
+        color: #f8fafc;
+      }
+      .hero h1 {
+        margin: 0 0 0.35rem;
+        font-size: clamp(2rem, 4vw, 3rem);
+        letter-spacing: -0.03em;
+      }
+      .hero p {
+        margin: 0;
+        opacity: 0.85;
+      }
+      .subtext {
+        font-size: 0.95rem;
+        color: #cbd5f5;
+      }
+      .btn-ghost {
+        border: 1px solid rgba(248, 250, 252, 0.3);
+        background: transparent;
+        color: #f8fafc;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 180ms ease, border-color 180ms ease;
+      }
+      .btn-ghost:hover {
+        background: rgba(248, 250, 252, 0.08);
+        border-color: rgba(248, 250, 252, 0.6);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.25rem;
+      }
+      .panel {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 1.25rem;
         padding: 1.5rem;
-        box-shadow: 0 20px 25px -5px rgb(15 23 42 / 0.1), 0 10px 10px -5px rgb(15 23 42 / 0.04);
-        margin-bottom: 1.5rem;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 30px 60px rgba(2, 6, 23, 0.35);
+      }
+      .panel h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1.2rem;
+        letter-spacing: -0.01em;
+        color: #f8fafc;
+      }
+      .panel p {
+        margin: 0 0 1.25rem;
+        color: #94a3b8;
       }
       label {
-        font-size: 0.85rem;
-        font-weight: 600;
         display: block;
-        margin-bottom: 0.25rem;
+        color: #cbd5f5;
+        margin-bottom: 0.35rem;
+        font-size: 0.85rem;
       }
       input {
         width: 100%;
-        padding: 0.75rem;
-        border-radius: 0.75rem;
-        border: 1px solid #d1d5db;
-        font-size: 0.95rem;
+        border-radius: 0.85rem;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(15, 23, 42, 0.6);
+        color: #f8fafc;
+        padding: 0.75rem 0.9rem;
+        font-size: 1rem;
         margin-bottom: 0.75rem;
+        transition: border 150ms ease, background 150ms ease;
       }
-      button {
+      input:focus {
+        outline: none;
+        border-color: rgba(248, 250, 252, 0.6);
+        background: rgba(15, 23, 42, 0.85);
+      }
+      button.primary {
         border: none;
         border-radius: 999px;
-        padding: 0.65rem 1.5rem;
+        padding: 0.8rem 1.75rem;
         font-weight: 600;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 0.35rem;
-      }
-      button.primary {
-        background: #111827;
+        background: linear-gradient(120deg, #2563eb, #7c3aed);
         color: #fff;
+        box-shadow: 0 15px 30px rgba(37, 99, 235, 0.4);
+        transition: transform 180ms ease, box-shadow 180ms ease;
+      }
+      button.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 25px 45px rgba(37, 99, 235, 0.45);
       }
       button.secondary {
-        background: #e5e7eb;
-        color: #111827;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 999px;
+        padding: 0.65rem 1.5rem;
+        background: transparent;
+        color: #e2e8f0;
+        font-weight: 600;
+        cursor: pointer;
       }
       button.danger {
-        background: #f87171;
-        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 0.6rem 1.3rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: rgba(239, 68, 68, 0.15);
+        color: #fecaca;
       }
       .feeds-list {
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        margin-top: 1rem;
       }
-      .feed-row {
+      .feed-card {
+        border-radius: 1rem;
+        padding: 1.25rem;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.12);
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
-        padding: 1rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.85rem;
-        background: #fff;
+        gap: 0.85rem;
       }
-      .feed-row h3 {
+      .feed-card header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
         margin: 0;
-        font-size: 1rem;
+      }
+      .feed-card h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        color: #f8fafc;
       }
       .feed-meta {
         font-size: 0.85rem;
-        color: #475569;
-      }
-      .status {
-        margin-top: 0.5rem;
-        font-size: 0.85rem;
-        color: #0f172a;
-      }
-      .status.error {
-        color: #b91c1c;
+        color: #94a3b8;
       }
       .inline-form {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 0.75rem;
       }
-      .admin-hint {
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.85rem;
+        background: rgba(37, 99, 235, 0.15);
+        border-radius: 999px;
+        color: #bfdbfe;
         font-size: 0.85rem;
-        color: #6b7280;
       }
-      #message {
-        margin-top: 0.5rem;
+      .status {
         font-size: 0.9rem;
-        min-height: 1.2rem;
+        color: #cbd5f5;
       }
-      @media (max-width: 640px) {
-        body {
-          padding: 1rem;
+      #toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        min-width: 220px;
+        padding: 0.9rem 1.2rem;
+        border-radius: 0.9rem;
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+        box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(20px);
+        transition: opacity 200ms ease, transform 200ms ease;
+      }
+      #toast.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      #toast.error {
+        background: rgba(185, 28, 28, 0.9);
+      }
+      @media (max-width: 720px) {
+        header {
+          flex-direction: column;
         }
       }
     </style>
   </head>
 
   <body>
-    <header>
-      <h1>RSS → Mailgun</h1>
-      <p>Currently delivering new feed items to <strong>${escapeHtml(recipient)}</strong>.</p>
-    </header>
+    <main class="app-shell">
+      <header>
+        <div class="hero">
+          <p class="chip">Hourly digest enabled</p>
+          <h1>RSS → Mailgun</h1>
+          <p class="subtext">New items land in <strong>${escapeHtml(recipient)}</strong>.</p>
+        </div>
+        <button class="btn-ghost" id="change-key">Change key</button>
+      </header>
 
-    <section class="card">
-      <h2>Admin Access</h2>
-      <label for="admin-key">Management API key</label>
-      <input id="admin-key" type="password" placeholder="Enter the MANAGEMENT_API_KEY value" autocomplete="off" />
-      <p class="admin-hint">
-        ${requiresAdminKey ? "The key is required for mutations or manual runs." : "No admin key set — mutating endpoints are open."}
-      </p>
-      <button class="secondary" id="save-key">Save key locally</button>
-      <div id="message"></div>
-    </section>
+      <div class="grid">
+        <section class="panel">
+          <h2>Manual run</h2>
+          <p>Fetch every feed and send a digest right now.</p>
+          <button class="primary" id="run-now">Run job</button>
+          <p id="run-status" class="subtext" style="margin-top:0.75rem;"></p>
+        </section>
 
-    <section class="card">
-      <h2>Add a feed</h2>
-      <form id="add-feed-form">
-        <label for="new-feed-title">Title</label>
-        <input id="new-feed-title" name="title" placeholder="Tech News" />
-        <label for="new-feed-url">Feed URL</label>
-        <input id="new-feed-url" name="url" placeholder="https://example.com/rss.xml" required />
-        <button class="primary" type="submit">Add feed</button>
-      </form>
-    </section>
+        <section class="panel">
+          <h2>Add a feed</h2>
+          <form id="add-feed-form">
+            <label for="new-feed-title">Title</label>
+            <input id="new-feed-title" name="title" placeholder="Tech News" />
+            <label for="new-feed-url">Feed URL</label>
+            <input id="new-feed-url" name="url" placeholder="https://example.com/rss.xml" required />
+            <button class="primary" type="submit">Save feed</button>
+          </form>
+        </section>
+      </div>
 
-    <section class="card">
-      <h2>Manual run</h2>
-      <p>Kick off the hourly job immediately.</p>
-      <button class="primary" id="run-now">Run fetch & email now</button>
-      <div id="run-status" class="admin-hint"></div>
-    </section>
-
-    <section class="card">
-      <h2>Configured feeds</h2>
-      <div id="feeds-empty" class="admin-hint"${
-        feeds.length ? ' style="display:none;"' : ""
-      }>No feeds yet — add one above.</div>
-      <div id="feeds-list" class="feeds-list"></div>
-      <button class="secondary" id="refresh-feeds">Refresh list</button>
-    </section>
+      <section class="panel" style="margin-top:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+          <h2>Feeds</h2>
+          <button class="secondary" id="refresh-feeds">Refresh</button>
+        </div>
+        <div id="feeds-empty" class="subtext"${
+          feeds.length ? ' style="display:none;"' : ""
+        }>Nothing yet. Add a feed to start watching.</div>
+        <div id="feeds-list" class="feeds-list"></div>
+      </section>
+    </main>
+    <div id="toast"></div>
 
     <script>
       const state = {
         feeds: ${initialFeeds},
       };
 
-      const adminInput = document.getElementById("admin-key");
-      const savedKey = localStorage.getItem("rss-admin-key");
-      if (savedKey) {
-        adminInput.value = savedKey;
-      }
-
-      document.getElementById("save-key").addEventListener("click", () => {
-        localStorage.setItem("rss-admin-key", adminInput.value.trim());
-        setMessage("Saved key locally.");
+      const toast = document.getElementById("toast");
+      const KEY_STORAGE = "rss-admin-key";
+      document.getElementById("change-key").addEventListener("click", () => {
+        localStorage.removeItem(KEY_STORAGE);
+        ensureAdminKey(true);
       });
 
       document.getElementById("add-feed-form").addEventListener("submit", async (event) => {
@@ -209,64 +306,48 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
           title: form.title.value,
           url: form.url.value,
         };
-        const response = await fetch("/api/feeds", {
-          method: "POST",
-          headers: buildHeaders(),
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          setMessage(data.error || "Failed to add feed", true);
-          return;
+        try {
+          const response = await fetchWithAuth("/api/feeds", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) throw await response.json();
+          form.reset();
+          showToast("Feed added.");
+          await refreshFeeds();
+        } catch (error) {
+          handleError(error, "Failed to add feed.");
         }
-        form.reset();
-        setMessage("Feed added.");
-        await refreshFeeds();
       });
 
       document.getElementById("refresh-feeds").addEventListener("click", refreshFeeds);
       document.getElementById("run-now").addEventListener("click", async () => {
-        document.getElementById("run-status").textContent = "Running…";
-        const response = await fetch("/api/run", {
-          method: "POST",
-          headers: buildHeaders(false),
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          document.getElementById("run-status").textContent = data.error || "Job failed (check key).";
-          return;
+        const statusEl = document.getElementById("run-status");
+        statusEl.textContent = "Running job…";
+        try {
+          const response = await fetchWithAuth("/api/run", { method: "POST" });
+          if (!response.ok) throw await response.json();
+          const data = await response.json();
+          statusEl.textContent = data.message + " Checked " + data.feedsChecked + " feed(s).";
+          showToast("Manual run complete.");
+          await refreshFeeds();
+        } catch (error) {
+          statusEl.textContent = "Run failed.";
+          handleError(error, "Manual run failed.");
         }
-        const data = await response.json();
-        document.getElementById("run-status").textContent = data.message + " Checked " + data.feedsChecked + " feed(s).";
-        await refreshFeeds();
       });
 
-      function buildHeaders(includeJson = true) {
-        const headers = includeJson ? { "Content-Type": "application/json" } : {};
-        const key = adminInput.value.trim();
-        if (key) {
-          headers["X-Admin-Key"] = key;
-        }
-        return headers;
-      }
-
       async function refreshFeeds() {
-        const response = await fetch("/api/feeds", {
-          headers: buildHeaders(false),
-        });
-        if (!response.ok) {
-          setMessage("Unable to load feeds (check permissions).", true);
-          return;
+        try {
+          const response = await fetch("/api/feeds");
+          if (!response.ok) throw await response.json();
+          const data = await response.json();
+          state.feeds = data.feeds || [];
+          renderFeeds();
+        } catch (error) {
+          handleError(error, "Unable to load feeds.");
         }
-        const data = await response.json();
-        state.feeds = data.feeds || [];
-        renderFeeds();
-      }
-
-      function setMessage(message, isError = false) {
-        const el = document.getElementById("message");
-        el.style.color = isError ? "#b91c1c" : "#0f172a";
-        el.textContent = message;
       }
 
       function renderFeeds() {
@@ -284,14 +365,17 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
           .sort((a, b) => a.title.localeCompare(b.title))
           .forEach((feed) => {
             const wrapper = document.createElement("div");
-            wrapper.className = "feed-row";
+            wrapper.className = "feed-card";
             wrapper.innerHTML = \`
-              <div>
+              <header>
                 <h3>\${escapeHtml(feed.title)}</h3>
-                <p class="feed-meta"><a href="\${escapeHtml(feed.url)}" target="_blank" rel="noopener">\${escapeHtml(feed.url)}</a></p>
-                <p class="feed-meta">Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}</p>
-                <p class="feed-meta">Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}</p>
-              </div>
+                <a class="feed-meta" href="\${escapeHtml(feed.url)}" target="_blank" rel="noopener">\${escapeHtml(feed.url)}</a>
+                <p class="feed-meta">
+                  Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}
+                  <br />
+                  Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
+                </p>
+              </header>
               <div class="inline-form">
                 <div>
                   <label>Title</label>
@@ -301,7 +385,7 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
                   <label>URL</label>
                   <input data-field="url" value="\${feed.url}" />
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;">
                   <button class="secondary" data-action="save">Save</button>
                   <button class="danger" data-action="delete">Delete</button>
                 </div>
@@ -319,32 +403,31 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
                 inputs.forEach((input) => {
                   payload[input.dataset.field] = input.value;
                 });
-                const response = await fetch(\`/api/feeds/\${feed.id}\`, {
-                  method: "PUT",
-                  headers: buildHeaders(),
-                  body: JSON.stringify(payload),
-                });
-                if (!response.ok) {
-                  const data = await response.json().catch(() => ({}));
-                  setMessage(data.error || "Update failed", true);
-                  return;
+                try {
+                  const response = await fetchWithAuth(\`/api/feeds/\${feed.id}\`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+                  if (!response.ok) throw await response.json();
+                  showToast("Feed updated.");
+                  await refreshFeeds();
+                } catch (error) {
+                  handleError(error, "Update failed.");
                 }
-                setMessage("Feed updated.");
-                await refreshFeeds();
               }
               if (action === "delete") {
                 if (!confirm("Delete this feed?")) return;
-                const response = await fetch(\`/api/feeds/\${feed.id}\`, {
-                  method: "DELETE",
-                  headers: buildHeaders(false),
-                });
-                if (!response.ok) {
-                  const data = await response.json().catch(() => ({}));
-                  setMessage(data.error || "Delete failed", true);
-                  return;
+                try {
+                  const response = await fetchWithAuth(\`/api/feeds/\${feed.id}\`, {
+                    method: "DELETE",
+                  });
+                  if (!response.ok) throw await response.json();
+                  showToast("Feed deleted.");
+                  await refreshFeeds();
+                } catch (error) {
+                  handleError(error, "Delete failed.");
                 }
-                setMessage("Feed deleted.");
-                await refreshFeeds();
               }
             });
 
@@ -359,6 +442,49 @@ export function renderHtml({ feeds, recipient, requiresAdminKey }: PageProps) {
         } catch {
           return value;
         }
+      }
+
+      function ensureAdminKey(force = false) {
+        let key = localStorage.getItem(KEY_STORAGE);
+        if (!key || force) {
+          key = prompt("Enter MANAGEMENT_API_KEY value");
+          if (!key) {
+            showToast("Admin key required for this action.", true);
+            throw new Error("Admin key missing");
+          }
+          localStorage.setItem(KEY_STORAGE, key.trim());
+        }
+        return key.trim();
+      }
+
+      async function fetchWithAuth(url, init = {}) {
+        const headers = new Headers(init.headers || {});
+        const key = ensureAdminKey();
+        headers.set("X-Admin-Key", key);
+        const response = await fetch(url, { ...init, headers });
+        if (response.status === 401) {
+          localStorage.removeItem(KEY_STORAGE);
+          showToast("Admin key rejected. Please enter it again.", true);
+          throw new Error("Unauthorized");
+        }
+        return response;
+      }
+
+      function handleError(error, fallback) {
+        const message = (error && error.error) || error?.message || fallback;
+        showToast(message || fallback, true);
+        console.error(error);
+      }
+
+      function showToast(message, isError = false) {
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        toast.classList.add("visible");
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => {
+          toast.classList.remove("visible");
+          toast.classList.remove("error");
+        }, 3200);
       }
 
       function escapeHtml(str) {

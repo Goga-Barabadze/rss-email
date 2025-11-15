@@ -3,6 +3,16 @@
   "main": "src/index.ts",
   "name": "rss-email",
   "upload_source_maps": true,
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "FEEDS_KV",
+      "id": "REPLACE_WITH_PRODUCTION_KV_ID",
+      "preview_id": "REPLACE_WITH_PREVIEW_KV_ID"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -10,6 +20,11 @@
       "database_name": "database"
     }
   ],
+  "vars": {
+    "MAILGUN_DOMAIN": "mg.example.com",
+    "MAILGUN_FROM": "RSS Worker <rss@example.com>",
+    "MAILGUN_RECIPIENT": "gobarabadze@gmail.com"
+  },
   "observability": {
     "enabled": true
   }

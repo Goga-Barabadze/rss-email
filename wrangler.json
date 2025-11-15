@@ -1,0 +1,16 @@
+{
+  "compatibility_date": "2025-10-08",
+  "main": "src/index.ts",
+  "name": "rss-email",
+  "upload_source_maps": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "d609b147-9a57-4967-81e6-0f47fdf8dbcb",
+      "database_name": "database"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

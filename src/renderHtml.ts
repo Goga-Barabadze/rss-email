@@ -2,6 +2,7 @@ export interface FeedPageDataFeed {
   id: string;
   title: string;
   url: string;
+  group?: string;
   createdAt: string;
   updatedAt?: string;
   lastRunAt?: string;
@@ -267,6 +268,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-title" name="title" placeholder="Tech News" />
             <label for="new-feed-url">Feed URL</label>
             <input id="new-feed-url" name="url" placeholder="https://example.com/rss.xml" required />
+            <label for="new-feed-group">Group (optional)</label>
+            <input id="new-feed-group" name="group" placeholder="Tech, News, etc. (leave empty for default)" />
             <button class="primary" type="submit">Save feed</button>
           </form>
         </section>
@@ -298,6 +301,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         const payload = {
           title: form.title.value,
           url: form.url.value,
+          group: form.group.value.trim() || undefined,
         };
         try {
           const response = await fetch("/api/feeds", {
@@ -322,7 +326,14 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           const response = await fetch("/api/run", { method: "POST" });
           if (!response.ok) throw await response.json();
           const data = await response.json();
-          statusEl.textContent = data.message + " Checked " + data.feedsChecked + " feed(s).";
+          let statusText = data.message;
+          if (data.emailsSent > 0) {
+            statusText += " Sent " + data.emailsSent + " email(s).";
+          }
+          if (data.emailsFailed > 0) {
+            statusText += " Failed: " + data.emailsFailed + " email(s).";
+          }
+          statusEl.textContent = statusText + " Checked " + data.feedsChecked + " feed(s).";
           showToast("Manual run complete.");
           await refreshFeeds();
         } catch (error) {
@@ -361,7 +372,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             wrapper.className = "feed-card";
             wrapper.innerHTML = \`
               <header>
-                <h3>\${escapeHtml(feed.title)}</h3>
+                <h3>\${escapeHtml(feed.title)}\${feed.group ? " <span class=\\"chip\\" style=\\"margin-left:0.5rem;font-size:0.75rem;\\">" + escapeHtml(feed.group) + "</span>" : ""}</h3>
                 <a class="feed-meta" href="\${escapeHtml(feed.url)}" target="_blank" rel="noopener">\${escapeHtml(feed.url)}</a>
                 <p class="feed-meta">
                   Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}
@@ -377,6 +388,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 <div>
                   <label>URL</label>
                   <input data-field="url" value="\${feed.url}" />
+                </div>
+                <div>
+                  <label>Group</label>
+                  <input data-field="group" value="\${feed.group || ""}" placeholder="default" />
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;">
                   <button class="secondary" data-action="save">Save</button>
@@ -394,7 +409,12 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 const inputs = wrapper.querySelectorAll("input[data-field]");
                 const payload = {};
                 inputs.forEach((input) => {
-                  payload[input.dataset.field] = input.value;
+                  const value = input.value.trim();
+                  if (input.dataset.field === "group") {
+                    payload[input.dataset.field] = value || undefined;
+                  } else {
+                    payload[input.dataset.field] = value;
+                  }
                 });
                 try {
                   const response = await fetch(\`/api/feeds/\${feed.id}\`, {

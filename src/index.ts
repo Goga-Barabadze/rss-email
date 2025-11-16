@@ -14,6 +14,7 @@ interface StoredFeed extends FeedPageDataFeed {}
 interface FeedInput {
   title?: string;
   url?: string;
+  group?: string;
 }
 
 interface FeedJobItem {
@@ -33,7 +34,8 @@ interface JobResult {
   feedsChecked: number;
   feedsWithNewItems: number;
   totalNewItems: number;
-  emailSent: boolean;
+  emailsSent: number;
+  emailsFailed: number;
   message: string;
 }
 
@@ -96,6 +98,7 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
       id: crypto.randomUUID(),
       url: body.url.trim(),
       title: (body.title ?? body.url).trim(),
+      group: body.group?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
     feeds.push(newFeed);
@@ -116,14 +119,17 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
 
   if (method === "PUT") {
     const body = (await readJson<FeedInput>(request)) ?? {};
-    if (!body.url && !body.title) {
-      return jsonResponse({ error: "Provide title or url to update" }, 400);
+    if (!body.url && !body.title && body.group === undefined) {
+      return jsonResponse({ error: "Provide title, url, or group to update" }, 400);
     }
     if (body.url) {
       feeds[index].url = body.url.trim();
     }
     if (body.title) {
       feeds[index].title = body.title.trim();
+    }
+    if (body.group !== undefined) {
+      feeds[index].group = body.group?.trim() || undefined;
     }
     feeds[index].updatedAt = new Date().toISOString();
     await saveFeeds(env, feeds);
@@ -146,7 +152,8 @@ async function processFeeds(env: Env): Promise<JobResult> {
       feedsChecked: 0,
       feedsWithNewItems: 0,
       totalNewItems: 0,
-      emailSent: false,
+      emailsSent: 0,
+      emailsFailed: 0,
       message: "No feeds configured.",
     };
   }
@@ -184,40 +191,59 @@ async function processFeeds(env: Env): Promise<JobResult> {
     }
   }
 
-  let emailSent = false;
+  let emailsSent = 0;
+  let emailsFailed = 0;
   if (feedsWithItems.length) {
-    try {
-      await sendDigestEmail(env, feedsWithItems);
-      emailSent = true;
-      for (const job of feedsWithItems) {
-        for (const item of job.items) {
-          const uniqueKey = await hashIdentifier(`${job.feed.id}:${item.id}`);
-          await env.FEEDS_KV.put(sentKey(job.feed.id, uniqueKey), "1", {
-            expirationTtl: SENT_TTL_SECONDS,
-          });
+    // Group feeds by their group field (default to "default" if not set)
+    const groups = new Map<string, FeedJobItem[]>();
+    for (const job of feedsWithItems) {
+      const groupKey = job.feed.group?.trim() || "default";
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+      }
+      groups.get(groupKey)!.push(job);
+    }
+
+    // Send one email per group
+    for (const [groupName, groupJobs] of groups.entries()) {
+      try {
+        await sendDigestEmail(env, groupJobs, groupName);
+        emailsSent++;
+        for (const job of groupJobs) {
+          for (const item of job.items) {
+            const uniqueKey = await hashIdentifier(`${job.feed.id}:${item.id}`);
+            await env.FEEDS_KV.put(sentKey(job.feed.id, uniqueKey), "1", {
+              expirationTtl: SENT_TTL_SECONDS,
+            });
+          }
+          job.feed.lastRunSummary = `Sent ${job.items.length} new item(s)${groupName !== "default" ? ` (group: ${groupName})` : ""}`;
         }
-        job.feed.lastRunSummary = `Sent ${job.items.length} new item(s)`;
+      } catch (error) {
+        emailsFailed++;
+        const message =
+          error instanceof Error ? error.message : "Unknown email error";
+        for (const job of groupJobs) {
+          job.feed.lastRunSummary = `Email failed: ${message}`;
+        }
+        console.error(`Failed to send Mailgun email for group "${groupName}"`, error);
       }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown email error";
-      for (const job of feedsWithItems) {
-        job.feed.lastRunSummary = `Email failed: ${message}`;
-      }
-      console.error("Failed to send Mailgun email", error);
     }
   }
 
   await saveFeeds(env, feeds);
 
+  const totalGroups = new Set(feedsWithItems.map(job => job.feed.group?.trim() || "default")).size;
   return {
     feedsChecked: feeds.length,
     feedsWithNewItems: feedsWithItems.length,
     totalNewItems,
-    emailSent,
-    message: emailSent
-      ? "Digest email sent."
-      : "No email required (no new items or send failed).",
+    emailsSent,
+    emailsFailed,
+    message: emailsSent > 0
+      ? `Sent ${emailsSent} email(s) for ${totalGroups} group(s).`
+      : emailsFailed > 0
+      ? `Failed to send ${emailsFailed} email(s).`
+      : "No email required (no new items).",
   };
 }
 
@@ -292,7 +318,7 @@ function toArray<T>(value: T | T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-async function sendDigestEmail(env: Env, jobs: FeedJobItem[]) {
+async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string) {
   if (!env.MAILGUN_API_KEY) {
     throw new Error("MAILGUN_API_KEY missing");
   }
@@ -300,18 +326,19 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[]) {
     throw new Error("MAILGUN_DOMAIN missing");
   }
 
-  const subject = `RSS update: ${jobs.reduce(
+  const groupLabel = groupName && groupName !== "default" ? ` [${groupName}]` : "";
+  const subject = `RSS update${groupLabel}: ${jobs.reduce(
     (sum, job) => sum + job.items.length,
     0,
   )} new item(s)`;
 
   const htmlParts: string[] = [
-    `<h2>RSS Digest (${new Date().toLocaleString("en-US", {
+    `<h2>RSS Digest${groupName && groupName !== "default" ? ` - ${escapeHtml(groupName)}` : ""} (${new Date().toLocaleString("en-US", {
       timeZone: "UTC",
     })} UTC)</h2>`,
   ];
 
-  const textParts: string[] = [`RSS Digest\n`];
+  const textParts: string[] = [`RSS Digest${groupName && groupName !== "default" ? ` - ${groupName}` : ""}\n`];
 
   for (const job of jobs) {
     htmlParts.push(

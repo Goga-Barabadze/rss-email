@@ -3,6 +3,7 @@ export interface FeedPageDataFeed {
   title: string;
   url: string;
   group?: string;
+  intervalMinutes?: number;
   createdAt: string;
   updatedAt?: string;
   lastRunAt?: string;
@@ -270,6 +271,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-url" name="url" placeholder="https://example.com/rss.xml" required />
             <label for="new-feed-group">Group (optional)</label>
             <input id="new-feed-group" name="group" placeholder="Tech, News, etc. (leave empty for default)" />
+            <label for="new-feed-interval">Check interval (minutes)</label>
+            <input id="new-feed-interval" name="intervalMinutes" type="number" min="1" value="60" placeholder="60" />
             <button class="primary" type="submit">Save feed</button>
           </form>
         </section>
@@ -302,6 +305,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           title: form.title.value,
           url: form.url.value,
           group: form.group.value.trim() || undefined,
+          intervalMinutes: form.intervalMinutes.value ? Number(form.intervalMinutes.value) : undefined,
         };
         try {
           const response = await fetch("/api/feeds", {
@@ -377,7 +381,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 <p class="feed-meta">
                   Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}
                   <br />
-                  Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
+                  Interval: \${feed.intervalMinutes || 60} min | Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
                 </p>
               </header>
               <div class="inline-form">
@@ -392,6 +396,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 <div>
                   <label>Group</label>
                   <input data-field="group" value="\${feed.group || ""}" placeholder="default" />
+                </div>
+                <div>
+                  <label>Interval (min)</label>
+                  <input data-field="intervalMinutes" type="number" min="1" value="\${feed.intervalMinutes || 60}" />
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;">
                   <button class="secondary" data-action="save">Save</button>
@@ -412,6 +420,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   const value = input.value.trim();
                   if (input.dataset.field === "group") {
                     payload[input.dataset.field] = value || undefined;
+                  } else if (input.dataset.field === "intervalMinutes") {
+                    payload[input.dataset.field] = value ? Number(value) : undefined;
                   } else {
                     payload[input.dataset.field] = value;
                   }

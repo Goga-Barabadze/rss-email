@@ -15,6 +15,7 @@ interface FeedInput {
   title?: string;
   url?: string;
   group?: string;
+  intervalMinutes?: number;
 }
 
 interface FeedJobItem {
@@ -94,11 +95,15 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
       return jsonResponse({ error: "url is required" }, 400);
     }
     const feeds = await listFeeds(env);
+    const intervalMinutes = body.intervalMinutes !== undefined 
+      ? Math.max(1, Math.floor(Number(body.intervalMinutes))) 
+      : 60; // Default to 60 minutes (1 hour)
     const newFeed: StoredFeed = {
       id: crypto.randomUUID(),
       url: body.url.trim(),
       title: (body.title ?? body.url).trim(),
       group: body.group?.trim() || undefined,
+      intervalMinutes: intervalMinutes > 0 ? intervalMinutes : 60,
       createdAt: new Date().toISOString(),
     };
     feeds.push(newFeed);
@@ -119,8 +124,8 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
 
   if (method === "PUT") {
     const body = (await readJson<FeedInput>(request)) ?? {};
-    if (!body.url && !body.title && body.group === undefined) {
-      return jsonResponse({ error: "Provide title, url, or group to update" }, 400);
+    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined) {
+      return jsonResponse({ error: "Provide title, url, group, or intervalMinutes to update" }, 400);
     }
     if (body.url) {
       feeds[index].url = body.url.trim();
@@ -130,6 +135,10 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     }
     if (body.group !== undefined) {
       feeds[index].group = body.group?.trim() || undefined;
+    }
+    if (body.intervalMinutes !== undefined) {
+      const intervalMinutes = Math.max(1, Math.floor(Number(body.intervalMinutes)));
+      feeds[index].intervalMinutes = intervalMinutes > 0 ? intervalMinutes : 60;
     }
     feeds[index].updatedAt = new Date().toISOString();
     await saveFeeds(env, feeds);
@@ -160,9 +169,22 @@ async function processFeeds(env: Env): Promise<JobResult> {
 
   const feedsWithItems: FeedJobItem[] = [];
   let totalNewItems = 0;
+  const now = new Date();
 
   for (const feed of feeds) {
-    const now = new Date().toISOString();
+    // Check if enough time has passed since last run
+    const intervalMinutes = feed.intervalMinutes || 60; // Default to 60 minutes
+    if (feed.lastRunAt) {
+      const lastRun = new Date(feed.lastRunAt);
+      const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+      if (minutesSinceLastRun < intervalMinutes) {
+        const minutesUntilNext = Math.ceil(intervalMinutes - minutesSinceLastRun);
+        feed.lastRunSummary = `Skipped (next check in ${minutesUntilNext} min)`;
+        continue; // Skip this feed, not enough time has passed
+      }
+    }
+
+    const nowISO = now.toISOString();
     try {
       const items = await fetchFeedItems(feed.url);
       const newItems: ParsedItem[] = [];
@@ -187,7 +209,7 @@ async function processFeeds(env: Env): Promise<JobResult> {
       feed.lastRunSummary = `Failed: ${message}`;
       console.error(`Failed to fetch ${feed.url}`, error);
     } finally {
-      feed.lastRunAt = now;
+      feed.lastRunAt = nowISO;
     }
   }
 

@@ -376,10 +376,11 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
           (item) => {
             const prefixedLink = applyPrefix(item.link);
             const formattedDate = formatDateForEmail(item.published);
+            const cleanSummary = item.summary ? stripHtml(item.summary) : "";
             return `<div style="margin-bottom: 1rem;">
               <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb;">${escapeHtml(item.title)}</a>${
               formattedDate ? ` <span style="color: #6b7280; font-size: 0.9em;">${escapeHtml(formattedDate)}</span>` : ""
-            }${item.summary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(truncate(item.summary, 180))}</p>` : ""}
+            }${cleanSummary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(truncate(cleanSummary, 180))}</p>` : ""}
             </div>`;
           }
         )
@@ -495,6 +496,21 @@ function formatDateForEmail(dateString?: string): string {
   } catch {
     return "";
   }
+}
+
+function stripHtml(html: string): string {
+  // Remove HTML tags and decode HTML entities
+  return html
+    .replace(/<[^>]*>/g, "") // Remove all HTML tags
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
 }
 
 function buildCorsResponse() {

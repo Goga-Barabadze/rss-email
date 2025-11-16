@@ -353,19 +353,18 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
     throw new Error("MAILGUN_DOMAIN missing");
   }
 
-  const groupLabel = groupName && groupName !== "default" ? ` [${groupName}]` : "";
-  const subject = `RSS update${groupLabel}: ${jobs.reduce(
-    (sum, job) => sum + job.items.length,
-    0,
-  )} new item(s)`;
-
+  // Determine display name: use group name if set and not "default", otherwise use feed name
+  const displayName = groupName && groupName !== "default" 
+    ? groupName 
+    : (jobs.length === 1 ? jobs[0].feed.title : "RSS Feed");
+  
+  const subject = displayName;
+  
   const htmlParts: string[] = [
-    `<h2>RSS Digest${groupName && groupName !== "default" ? ` - ${escapeHtml(groupName)}` : ""} (${new Date().toLocaleString("en-US", {
-      timeZone: "UTC",
-    })} UTC)</h2>`,
+    `<h2>${escapeHtml(displayName)}</h2>`,
   ];
 
-  const textParts: string[] = [`RSS Digest${groupName && groupName !== "default" ? ` - ${groupName}` : ""}\n`];
+  const textParts: string[] = [`${displayName}\n`];
 
   for (const job of jobs) {
     const prefix = job.feed.linkPrefix || "";

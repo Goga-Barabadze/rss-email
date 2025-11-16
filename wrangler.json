@@ -21,8 +21,8 @@
     }
   ],
   "vars": {
-    "MAILGUN_DOMAIN": "mg.example.com",
-    "MAILGUN_FROM": "RSS Worker <rss@example.com>",
+    "MAILGUN_DOMAIN": "sandbox0df74d6d6543b998cb8878c55e08cc.mailgun.org",
+    "MAILGUN_FROM": "RSS <postmaster@sandbox0df74d6d6543b998cb8878c55e08cc.mailgun.org>",
     "MAILGUN_RECIPIENT": "gobarabadze@gmail.com"
   },
   "observability": {

@@ -22,7 +22,7 @@
   ],
   "vars": {
     "MAILGUN_DOMAIN": "sandboxe0df7f4d6d6543b998cb8878c55e08cc.mailgun.org",
-    "MAILGUN_FROM": "RSS <postmaster@sandboxe0df7f4d6d6543b998cb8878c55e08cc.mailgun.org>",
+    "MAILGUN_FROM": "New Items <postmaster@sandboxe0df7f4d6d6543b998cb8878c55e08cc.mailgun.org>",
     "MAILGUN_RECIPIENT": "gobarabadze@gmail.com"
   },
   "observability": {

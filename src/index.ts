@@ -361,7 +361,8 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
   const subject = displayName;
   
   const htmlParts: string[] = [
-    `<h2>${escapeHtml(displayName)}</h2>`,
+    `<div style="font-size: 1.2em; line-height: 1.6;">
+      <h2 style="font-size: 1.8em; margin-bottom: 1rem;">${escapeHtml(displayName)}</h2>`,
   ];
 
   const textParts: string[] = [`${displayName}\n`];
@@ -371,16 +372,16 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
     const applyPrefix = (url: string) => prefix ? prefix + url : url;
     
     htmlParts.push(
-      `<h3>${escapeHtml(job.feed.title)}</h3>${job.items
+      `<h3 style="font-size: 1.5em; margin-top: 1.5rem; margin-bottom: 0.75rem;">${escapeHtml(job.feed.title)}</h3>${job.items
         .map(
           (item) => {
             const prefixedLink = applyPrefix(item.link);
             const formattedDate = formatDateForEmail(item.published);
             const cleanSummary = item.summary ? stripHtml(item.summary) : "";
-            return `<div style="margin-bottom: 1rem;">
-              <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb;">${escapeHtml(item.title)}</a>${
-              formattedDate ? ` <span style="color: #6b7280; font-size: 0.9em;">${escapeHtml(formattedDate)}</span>` : ""
-            }${cleanSummary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(cleanSummary)}</p>` : ""}
+            return `<div style="margin-bottom: 1.2rem;">
+              <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb; font-size: 1.1em;">${escapeHtml(item.title)}</a>${
+              formattedDate ? ` <span style="color: #6b7280; font-size: 1.08em;">${escapeHtml(formattedDate)}</span>` : ""
+            }${cleanSummary ? `<p style="margin-top: 0.5rem; color: #4b5563; font-size: 1.14em;">${escapeHtml(cleanSummary)}</p>` : ""}
             </div>`;
           }
         )
@@ -397,6 +398,8 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
         .join("\n")}`,
     );
   }
+
+  htmlParts.push("</div>");
 
   const params = new URLSearchParams();
   params.append("from", env.MAILGUN_FROM);

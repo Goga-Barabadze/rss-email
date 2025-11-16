@@ -380,7 +380,7 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
             return `<div style="margin-bottom: 1rem;">
               <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb;">${escapeHtml(item.title)}</a>${
               formattedDate ? ` <span style="color: #6b7280; font-size: 0.9em;">${escapeHtml(formattedDate)}</span>` : ""
-            }${cleanSummary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(truncate(cleanSummary, 180))}</p>` : ""}
+            }${cleanSummary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(cleanSummary)}</p>` : ""}
             </div>`;
           }
         )

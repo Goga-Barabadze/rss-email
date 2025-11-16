@@ -371,23 +371,27 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
     const applyPrefix = (url: string) => prefix ? prefix + url : url;
     
     htmlParts.push(
-      `<h3>${escapeHtml(job.feed.title)}</h3><ul>${job.items
+      `<h3>${escapeHtml(job.feed.title)}</h3>${job.items
         .map(
           (item) => {
             const prefixedLink = applyPrefix(item.link);
-            return `<li><a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>${
-              item.published ? ` <em>${escapeHtml(item.published)}</em>` : ""
-            }${item.summary ? `<p>${escapeHtml(truncate(item.summary, 180))}</p>` : ""}</li>`;
+            const formattedDate = formatDateForEmail(item.published);
+            return `<div style="margin-bottom: 1rem;">
+              <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb;">${escapeHtml(item.title)}</a>${
+              formattedDate ? ` <span style="color: #6b7280; font-size: 0.9em;">${escapeHtml(formattedDate)}</span>` : ""
+            }${item.summary ? `<p style="margin-top: 0.25rem; color: #4b5563; font-size: 0.95em;">${escapeHtml(truncate(item.summary, 180))}</p>` : ""}
+            </div>`;
           }
         )
-        .join("")}</ul>`,
+        .join("")}`,
     );
 
     textParts.push(
       `\n${job.feed.title}\n${job.items
         .map((item) => {
           const prefixedLink = applyPrefix(item.link);
-          return `- ${item.title} (${prefixedLink})`;
+          const formattedDate = formatDateForEmail(item.published);
+          return `${item.title}${formattedDate ? ` (${formattedDate})` : ""} - ${prefixedLink}`;
         })
         .join("\n")}`,
     );
@@ -476,6 +480,21 @@ function escapeHtml(value: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function formatDateForEmail(dateString?: string): string {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    const day = date.getDate();
+    const month = date.getMonth() + 1; // getMonth() returns 0-11
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${day}.${month}. at ${hours}:${minutes}`;
+  } catch {
+    return "";
+  }
 }
 
 function buildCorsResponse() {

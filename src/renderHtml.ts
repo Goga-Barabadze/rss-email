@@ -4,6 +4,7 @@ export interface FeedPageDataFeed {
   url: string;
   group?: string;
   intervalMinutes?: number;
+  linkPrefix?: string;
   createdAt: string;
   updatedAt?: string;
   lastRunAt?: string;
@@ -273,6 +274,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-group" name="group" placeholder="Tech, News, etc. (leave empty for default)" />
             <label for="new-feed-interval">Check interval (minutes)</label>
             <input id="new-feed-interval" name="intervalMinutes" type="number" min="1" value="60" placeholder="60" />
+            <label for="new-feed-link-prefix">Link prefix (optional)</label>
+            <input id="new-feed-link-prefix" name="linkPrefix" placeholder="https://archive.is/" />
             <button class="primary" type="submit">Save feed</button>
           </form>
         </section>
@@ -306,6 +309,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           url: form.url.value,
           group: form.group.value.trim() || undefined,
           intervalMinutes: form.intervalMinutes.value ? Number(form.intervalMinutes.value) : undefined,
+          linkPrefix: form.linkPrefix.value.trim() || undefined,
         };
         try {
           const response = await fetch("/api/feeds", {
@@ -381,7 +385,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 <p class="feed-meta">
                   Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}
                   <br />
-                  Interval: \${feed.intervalMinutes || 60} min | Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
+                  Interval: \${feed.intervalMinutes || 60} min\${feed.linkPrefix ? " | Prefix: " + escapeHtml(feed.linkPrefix) : ""} | Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
                 </p>
               </header>
               <div class="inline-form">
@@ -401,6 +405,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label>Interval (min)</label>
                   <input data-field="intervalMinutes" type="number" min="1" value="\${feed.intervalMinutes || 60}" />
                 </div>
+                <div>
+                  <label>Link prefix</label>
+                  <input data-field="linkPrefix" value="\${feed.linkPrefix || ""}" placeholder="https://archive.is/" />
+                </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;">
                   <button class="secondary" data-action="save">Save</button>
                   <button class="danger" data-action="delete">Delete</button>
@@ -418,7 +426,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 const payload = {};
                 inputs.forEach((input) => {
                   const value = input.value.trim();
-                  if (input.dataset.field === "group") {
+                  if (input.dataset.field === "group" || input.dataset.field === "linkPrefix") {
                     payload[input.dataset.field] = value || undefined;
                   } else if (input.dataset.field === "intervalMinutes") {
                     payload[input.dataset.field] = value ? Number(value) : undefined;

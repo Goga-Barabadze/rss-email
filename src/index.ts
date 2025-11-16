@@ -16,6 +16,7 @@ interface FeedInput {
   url?: string;
   group?: string;
   intervalMinutes?: number;
+  linkPrefix?: string;
 }
 
 interface FeedJobItem {
@@ -104,6 +105,7 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
       title: (body.title ?? body.url).trim(),
       group: body.group?.trim() || undefined,
       intervalMinutes: intervalMinutes > 0 ? intervalMinutes : 60,
+      linkPrefix: body.linkPrefix?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
     feeds.push(newFeed);
@@ -124,8 +126,8 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
 
   if (method === "PUT") {
     const body = (await readJson<FeedInput>(request)) ?? {};
-    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined) {
-      return jsonResponse({ error: "Provide title, url, group, or intervalMinutes to update" }, 400);
+    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined && body.linkPrefix === undefined) {
+      return jsonResponse({ error: "Provide title, url, group, intervalMinutes, or linkPrefix to update" }, 400);
     }
     if (body.url) {
       feeds[index].url = body.url.trim();
@@ -139,6 +141,9 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     if (body.intervalMinutes !== undefined) {
       const intervalMinutes = Math.max(1, Math.floor(Number(body.intervalMinutes)));
       feeds[index].intervalMinutes = intervalMinutes > 0 ? intervalMinutes : 60;
+    }
+    if (body.linkPrefix !== undefined) {
+      feeds[index].linkPrefix = body.linkPrefix?.trim() || undefined;
     }
     feeds[index].updatedAt = new Date().toISOString();
     await saveFeeds(env, feeds);
@@ -363,20 +368,28 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
   const textParts: string[] = [`RSS Digest${groupName && groupName !== "default" ? ` - ${groupName}` : ""}\n`];
 
   for (const job of jobs) {
+    const prefix = job.feed.linkPrefix || "";
+    const applyPrefix = (url: string) => prefix ? prefix + url : url;
+    
     htmlParts.push(
       `<h3>${escapeHtml(job.feed.title)}</h3><ul>${job.items
         .map(
-          (item) =>
-            `<li><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>${
+          (item) => {
+            const prefixedLink = applyPrefix(item.link);
+            return `<li><a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>${
               item.published ? ` <em>${escapeHtml(item.published)}</em>` : ""
-            }${item.summary ? `<p>${escapeHtml(truncate(item.summary, 180))}</p>` : ""}</li>`,
+            }${item.summary ? `<p>${escapeHtml(truncate(item.summary, 180))}</p>` : ""}</li>`;
+          }
         )
         .join("")}</ul>`,
     );
 
     textParts.push(
       `\n${job.feed.title}\n${job.items
-        .map((item) => `- ${item.title} (${item.link})`)
+        .map((item) => {
+          const prefixedLink = applyPrefix(item.link);
+          return `- ${item.title} (${prefixedLink})`;
+        })
         .join("\n")}`,
     );
   }

@@ -349,13 +349,6 @@ export function renderHtml({ feeds, recipient }: PageProps) {
 
   <body>
     <main class="app-shell">
-      <header>
-        <div class="hero">
-          <p class="chip">Hourly digest enabled</p>
-          <h1>RSS → Mailgun</h1>
-          <p class="subtext">New items land in <strong>${escapeHtml(recipient)}</strong>.</p>
-        </div>
-      </header>
 
       <div class="grid">
         <section class="panel">

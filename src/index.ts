@@ -17,6 +17,10 @@ interface FeedInput {
   group?: string;
   intervalMinutes?: number;
   linkPrefix?: string;
+  isScrapedFeed?: boolean;
+  titleSelector?: string;
+  linkSelector?: string;
+  descriptionSelector?: string;
 }
 
 interface FeedJobItem {
@@ -106,6 +110,10 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
       group: body.group?.trim() || undefined,
       intervalMinutes: intervalMinutes > 0 ? intervalMinutes : 60,
       linkPrefix: body.linkPrefix?.trim() || undefined,
+      isScrapedFeed: body.isScrapedFeed || false,
+      titleSelector: body.titleSelector?.trim() || undefined,
+      linkSelector: body.linkSelector?.trim() || undefined,
+      descriptionSelector: body.descriptionSelector?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
     feeds.push(newFeed);
@@ -126,8 +134,8 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
 
   if (method === "PUT") {
     const body = (await readJson<FeedInput>(request)) ?? {};
-    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined && body.linkPrefix === undefined) {
-      return jsonResponse({ error: "Provide title, url, group, intervalMinutes, or linkPrefix to update" }, 400);
+    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined && body.linkPrefix === undefined && body.isScrapedFeed === undefined && body.titleSelector === undefined && body.linkSelector === undefined && body.descriptionSelector === undefined) {
+      return jsonResponse({ error: "Provide at least one field to update" }, 400);
     }
     if (body.url) {
       feeds[index].url = body.url.trim();
@@ -144,6 +152,18 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     }
     if (body.linkPrefix !== undefined) {
       feeds[index].linkPrefix = body.linkPrefix?.trim() || undefined;
+    }
+    if (body.isScrapedFeed !== undefined) {
+      feeds[index].isScrapedFeed = body.isScrapedFeed;
+    }
+    if (body.titleSelector !== undefined) {
+      feeds[index].titleSelector = body.titleSelector?.trim() || undefined;
+    }
+    if (body.linkSelector !== undefined) {
+      feeds[index].linkSelector = body.linkSelector?.trim() || undefined;
+    }
+    if (body.descriptionSelector !== undefined) {
+      feeds[index].descriptionSelector = body.descriptionSelector?.trim() || undefined;
     }
     feeds[index].updatedAt = new Date().toISOString();
     await saveFeeds(env, feeds);
@@ -191,7 +211,9 @@ async function processFeeds(env: Env): Promise<JobResult> {
 
     const nowISO = now.toISOString();
     try {
-      const items = await fetchFeedItems(feed.url);
+      const items = feed.isScrapedFeed 
+        ? await scrapeFeedItems(feed)
+        : await fetchFeedItems(feed.url);
       const newItems: ParsedItem[] = [];
       for (const item of items) {
         const uniqueKey = await hashIdentifier(`${feed.id}:${item.id}`);
@@ -287,6 +309,123 @@ async function fetchFeedItems(url: string): Promise<ParsedItem[]> {
   }
   const text = await response.text();
   return parseFeed(text, url);
+}
+
+async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
+  if (!feed.titleSelector || !feed.linkSelector) {
+    throw new Error("Title and link selectors are required for scraped feeds");
+  }
+
+  const response = await fetch(feed.url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; RSS-Email-Worker/1.0)",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Fetch failed (${response.status})`);
+  }
+
+  const baseUrl = new URL(feed.url);
+  const items: ParsedItem[] = [];
+  
+  // Collect elements using HTMLRewriter
+  const titleElements: Array<{ text: string; order: number }> = [];
+  const linkElements: Array<{ href: string; order: number }> = [];
+  const descElements: Array<{ text: string; order: number }> = [];
+  
+  let titleOrder = 0;
+  let linkOrder = 0;
+  let descOrder = 0;
+
+  // Use HTMLRewriter to extract content
+  const titleTexts: string[] = [];
+  const descTexts: string[] = [];
+  let currentTitleIdx = -1;
+  let currentDescIdx = -1;
+  
+  const rewriter = new HTMLRewriter()
+    .on(feed.titleSelector, {
+      element() {
+        currentTitleIdx = titleTexts.length;
+        titleTexts.push("");
+      },
+      text(text) {
+        if (currentTitleIdx >= 0) {
+          titleTexts[currentTitleIdx] += text.text;
+        }
+      },
+    })
+    .on(feed.linkSelector, {
+      element(element) {
+        const href = element.getAttribute("href");
+        if (href) {
+          const absoluteUrl = href.startsWith("http") ? href : new URL(href, baseUrl).toString();
+          linkElements.push({ href: absoluteUrl, order: linkOrder++ });
+        }
+      },
+    });
+
+  if (feed.descriptionSelector) {
+    rewriter.on(feed.descriptionSelector, {
+      element() {
+        currentDescIdx = descTexts.length;
+        descTexts.push("");
+      },
+      text(text) {
+        if (currentDescIdx >= 0) {
+          descTexts[currentDescIdx] += text.text;
+        }
+      },
+    });
+  }
+
+  // Process the HTML stream
+  await rewriter.transform(response).arrayBuffer();
+
+  // Convert title texts to elements with order
+  titleTexts.forEach((text, idx) => {
+    if (text.trim()) {
+      titleElements.push({ text: text.trim(), order: idx });
+    }
+  });
+
+  // Convert desc texts to elements with order
+  descTexts.forEach((text, idx) => {
+    if (text.trim()) {
+      descElements.push({ text: text.trim(), order: idx });
+    }
+  });
+
+  // Match items by order (assuming they appear in the same sequence)
+  const maxItems = Math.max(titleElements.length, linkElements.length);
+  for (let i = 0; i < maxItems; i++) {
+    const titleEl = titleElements[i];
+    const linkEl = linkElements[i];
+    const descEl = descElements[i];
+
+    if (titleEl && linkEl) {
+      const title = stripHtml(titleEl.text).trim();
+      const link = linkEl.href;
+      const description = descEl ? stripHtml(descEl.text).trim() : undefined;
+
+      if (title && link) {
+        items.push({
+          id: `${feed.id}:${i}:${await hashIdentifier(link)}`,
+          title,
+          link,
+          summary: description,
+          published: undefined,
+        });
+      }
+    }
+  }
+
+  if (items.length === 0) {
+    throw new Error("No items found with the provided selectors");
+  }
+
+  return items;
 }
 
 function parseFeed(xml: string, fallbackUrl: string): ParsedItem[] {

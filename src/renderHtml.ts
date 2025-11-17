@@ -5,6 +5,10 @@ export interface FeedPageDataFeed {
   group?: string;
   intervalMinutes?: number;
   linkPrefix?: string;
+  isScrapedFeed?: boolean;
+  titleSelector?: string;
+  linkSelector?: string;
+  descriptionSelector?: string;
   createdAt: string;
   updatedAt?: string;
   lastRunAt?: string;
@@ -276,6 +280,18 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-interval" name="intervalMinutes" type="number" min="1" value="60" placeholder="60" />
             <label for="new-feed-link-prefix">Link prefix (optional)</label>
             <input id="new-feed-link-prefix" name="linkPrefix" placeholder="https://archive.is/" />
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <input type="checkbox" id="new-feed-scraped" name="isScrapedFeed" />
+              <span>Scrape website (not RSS feed)</span>
+            </label>
+            <div id="scraped-fields" style="display: none; margin-top: 0.75rem;">
+              <label for="new-feed-title-selector">Title CSS selector</label>
+              <input id="new-feed-title-selector" name="titleSelector" placeholder="h3, .title, #news-title" />
+              <label for="new-feed-link-selector">Link CSS selector</label>
+              <input id="new-feed-link-selector" name="linkSelector" placeholder="a, .link, a.article-link" />
+              <label for="new-feed-desc-selector">Description CSS selector (optional)</label>
+              <input id="new-feed-desc-selector" name="descriptionSelector" placeholder="p, .description, .summary" />
+            </div>
             <button class="primary" type="submit">Save feed</button>
           </form>
         </section>
@@ -301,15 +317,26 @@ export function renderHtml({ feeds, recipient }: PageProps) {
 
       const toast = document.getElementById("toast");
 
+      // Toggle scraped fields visibility
+      document.getElementById("new-feed-scraped").addEventListener("change", (event) => {
+        const scrapedFields = document.getElementById("scraped-fields");
+        scrapedFields.style.display = event.target.checked ? "block" : "none";
+      });
+
       document.getElementById("add-feed-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
+        const isScraped = form.isScrapedFeed.checked;
         const payload = {
           title: form.title.value,
           url: form.url.value,
           group: form.group.value.trim() || undefined,
           intervalMinutes: form.intervalMinutes.value ? Number(form.intervalMinutes.value) : undefined,
           linkPrefix: form.linkPrefix.value.trim() || undefined,
+          isScrapedFeed: isScraped,
+          titleSelector: isScraped ? form.titleSelector.value.trim() || undefined : undefined,
+          linkSelector: isScraped ? form.linkSelector.value.trim() || undefined : undefined,
+          descriptionSelector: isScraped ? form.descriptionSelector.value.trim() || undefined : undefined,
         };
         try {
           const response = await fetch("/api/feeds", {
@@ -409,6 +436,24 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label>Link prefix</label>
                   <input data-field="linkPrefix" value="\${feed.linkPrefix || ""}" placeholder="https://archive.is/" />
                 </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <input type="checkbox" data-field="isScrapedFeed" \${feed.isScrapedFeed ? "checked" : ""} />
+                  <label style="margin:0;">Scrape website</label>
+                </div>
+                <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "block" : "none"}; grid-column: 1 / -1;">
+                  <div>
+                    <label>Title selector</label>
+                    <input data-field="titleSelector" value="\${feed.titleSelector || ""}" placeholder="h3, .title" />
+                  </div>
+                  <div>
+                    <label>Link selector</label>
+                    <input data-field="linkSelector" value="\${feed.linkSelector || ""}" placeholder="a, .link" />
+                  </div>
+                  <div>
+                    <label>Description selector</label>
+                    <input data-field="descriptionSelector" value="\${feed.descriptionSelector || ""}" placeholder="p, .description" />
+                  </div>
+                </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;justify-content:flex-end;">
                   <button class="secondary" data-action="save">Save</button>
                   <button class="danger" data-action="delete">Delete</button>
@@ -416,6 +461,17 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               </div>
               <p class="status">\${feed.lastRunSummary || "Not run yet"}</p>
             \`;
+
+            // Toggle scraped fields in edit form
+            const scrapedCheckbox = wrapper.querySelector('input[data-field="isScrapedFeed"]');
+            const scrapedFields = wrapper.querySelector(".scraped-edit-fields");
+            if (scrapedCheckbox) {
+              scrapedCheckbox.addEventListener("change", (e) => {
+                if (scrapedFields) {
+                  scrapedFields.style.display = e.target.checked ? "block" : "none";
+                }
+              });
+            }
 
             wrapper.addEventListener("click", async (event) => {
               const target = event.target;
@@ -425,13 +481,18 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 const inputs = wrapper.querySelectorAll("input[data-field]");
                 const payload = {};
                 inputs.forEach((input) => {
-                  const value = input.value.trim();
-                  if (input.dataset.field === "group" || input.dataset.field === "linkPrefix") {
-                    payload[input.dataset.field] = value || undefined;
-                  } else if (input.dataset.field === "intervalMinutes") {
-                    payload[input.dataset.field] = value ? Number(value) : undefined;
+                  const field = input.dataset.field;
+                  if (field === "isScrapedFeed") {
+                    payload[field] = input.checked;
                   } else {
-                    payload[input.dataset.field] = value;
+                    const value = input.value.trim();
+                    if (field === "group" || field === "linkPrefix" || field === "titleSelector" || field === "linkSelector" || field === "descriptionSelector") {
+                      payload[field] = value || undefined;
+                    } else if (field === "intervalMinutes") {
+                      payload[field] = value ? Number(value) : undefined;
+                    } else {
+                      payload[field] = value;
+                    }
                   }
                 });
                 try {

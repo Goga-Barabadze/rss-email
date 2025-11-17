@@ -230,11 +230,13 @@ async function handleSelectorPreview(request: Request): Promise<Response> {
             
             let selector = element.tagName.toLowerCase();
             
-            if (element.className) {
-              const classes = element.className.split(" ").filter(c => c).join(".");
-              if (classes) {
-                selector += "." + classes;
-              }
+            // Get classes excluding the temporary highlight class
+            const classes = Array.from(element.classList)
+              .filter(c => c && c !== "rss-selector-highlight")
+              .join(".");
+            
+            if (classes) {
+              selector += "." + classes;
             }
             
             // Try to make it more specific by checking parent

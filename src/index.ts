@@ -58,6 +58,10 @@ export default {
       return buildCorsResponse();
     }
 
+    if (pathname === "/api/selector-preview") {
+      return handleSelectorPreview(request);
+    }
+
     if (pathname.startsWith("/api/feeds")) {
       return handleFeedApi(request, env, pathname);
     }
@@ -177,6 +181,179 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
   }
 
   return jsonResponse({ error: "Method Not Allowed" }, 405);
+}
+
+async function handleSelectorPreview(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const targetUrl = url.searchParams.get("url");
+  
+  if (!targetUrl) {
+    return new Response("URL parameter required", { status: 400 });
+  }
+
+  try {
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; RSS-Email-Worker/1.0)",
+      },
+    });
+
+    if (!response.ok) {
+      return new Response(`Failed to fetch: ${response.status}`, { status: response.status });
+    }
+
+    const html = await response.text();
+    
+    // Inject selection script
+    const selectionScript = `
+      <script>
+        (function() {
+          let mode = "title";
+          let hoveredElement = null;
+          
+          // Listen for mode changes from parent
+          window.addEventListener("message", (e) => {
+            if (e.data.type === "setMode") {
+              mode = e.data.mode;
+              resetHighlights();
+            }
+          });
+          
+          function generateSelector(element) {
+            if (element.id) {
+              return "#" + element.id;
+            }
+            
+            let selector = element.tagName.toLowerCase();
+            
+            if (element.className) {
+              const classes = element.className.split(" ").filter(c => c).join(".");
+              if (classes) {
+                selector += "." + classes;
+              }
+            }
+            
+            // Try to make it more specific by checking parent
+            const parent = element.parentElement;
+            if (parent) {
+              const siblings = Array.from(parent.children).filter(el => el.tagName === element.tagName);
+              if (siblings.length > 1) {
+                const index = siblings.indexOf(element);
+                selector = selector + ":nth-of-type(" + (index + 1) + ")";
+              }
+            }
+            
+            return selector;
+          }
+          
+          function resetHighlights() {
+            document.querySelectorAll(".rss-selector-highlight").forEach(el => {
+              el.classList.remove("rss-selector-highlight");
+            });
+          }
+          
+          function highlightElement(el) {
+            resetHighlights();
+            el.classList.add("rss-selector-highlight");
+          }
+          
+          // Add CSS for highlighting
+          const style = document.createElement("style");
+          style.textContent = \`
+            .rss-selector-highlight {
+              outline: 3px solid #2563eb !important;
+              outline-offset: 2px !important;
+              background-color: rgba(37, 99, 235, 0.1) !important;
+              cursor: pointer !important;
+            }
+            body * {
+              cursor: crosshair !important;
+            }
+          \`;
+          document.head.appendChild(style);
+          
+          document.addEventListener("mouseover", (e) => {
+            if (e.target !== document.body && e.target !== document.documentElement) {
+              let target = e.target;
+              // For link mode, highlight the link if hovering over content inside it
+              if (mode === "link") {
+                const link = target.closest("a");
+                if (link) {
+                  target = link;
+                }
+              }
+              highlightElement(target);
+              hoveredElement = target;
+            }
+          }, true);
+          
+          document.addEventListener("mouseout", (e) => {
+            if (hoveredElement === e.target) {
+              resetHighlights();
+              hoveredElement = null;
+            }
+          }, true);
+          
+          document.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            let element = e.target;
+            
+            // For link mode, find the closest <a> tag
+            if (mode === "link") {
+              const link = element.closest("a");
+              if (link) {
+                element = link;
+              } else if (element.tagName !== "A") {
+                // If clicked element isn't a link and no parent link found, try to find nearby links
+                const parent = element.parentElement;
+                if (parent) {
+                  const nearbyLink = parent.querySelector("a");
+                  if (nearbyLink) {
+                    element = nearbyLink;
+                  }
+                }
+              }
+            }
+            
+            const selector = generateSelector(element);
+            
+            // Send selector to parent
+            window.parent.postMessage({
+              type: "selector",
+              mode: mode,
+              selector: selector
+            }, "*");
+            
+            // Visual feedback
+            element.style.outline = "3px solid #10b981";
+            setTimeout(() => {
+              element.style.outline = "";
+            }, 1000);
+          }, true);
+        })();
+      </script>
+    `;
+    
+    // Inject script before closing body tag, or at the end if no body tag
+    let injectedHtml = html;
+    if (html.includes("</body>")) {
+      injectedHtml = html.replace("</body>", selectionScript + "</body>");
+    } else {
+      injectedHtml = html + selectionScript;
+    }
+    
+    return new Response(injectedHtml, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "X-Frame-Options": "SAMEORIGIN",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(`Error: ${message}`, { status: 500 });
+  }
 }
 
 async function processFeeds(env: Env): Promise<JobResult> {

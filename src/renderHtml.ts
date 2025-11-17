@@ -241,6 +241,63 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       #toast.error {
         background: rgba(185, 28, 28, 0.9);
       }
+      #selector-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        padding: 2rem;
+        overflow: auto;
+      }
+      #selector-modal.visible {
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-content {
+        background: #fff;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        max-width: 90vw;
+        max-height: 90vh;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-iframe {
+        width: 100%;
+        height: 60vh;
+        border: 2px solid #e2e8f0;
+        border-radius: 0.5rem;
+      }
+      .selector-instructions {
+        background: #f1f5f9;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.9em;
+      }
+      .selector-mode {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .selector-mode button {
+        padding: 0.5rem 1rem;
+        font-size: 0.9em;
+      }
+      .selector-mode button.active {
+        background: #2563eb;
+        color: #fff;
+      }
       @media (max-width: 720px) {
         header {
           flex-direction: column;
@@ -285,6 +342,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               <span>Scrape website (not RSS feed)</span>
             </label>
             <div id="scraped-fields" style="display: none; margin-top: 0.75rem;">
+              <button type="button" class="secondary" id="build-selectors-btn" style="margin-bottom: 0.75rem;">🔍 Build Selectors Interactively</button>
               <label for="new-feed-title-selector">Title CSS selector</label>
               <input id="new-feed-title-selector" name="titleSelector" placeholder="h3, .title, #news-title" />
               <label for="new-feed-link-selector">Link CSS selector</label>
@@ -309,6 +367,29 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       </section>
     </main>
     <div id="toast"></div>
+    <div id="selector-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Build CSS Selectors</h2>
+          <button class="secondary" id="close-modal">Close</button>
+        </div>
+        <div class="selector-instructions">
+          <p><strong>Instructions:</strong></p>
+          <ol style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>Select a mode below (Title, Link, or Description)</li>
+            <li>Click on an element in the preview to select it</li>
+            <li>The CSS selector will be generated and filled in automatically</li>
+            <li>Repeat for each field you need</li>
+          </ol>
+        </div>
+        <div class="selector-mode">
+          <button class="secondary active" data-mode="title">Select Title</button>
+          <button class="secondary" data-mode="link">Select Link</button>
+          <button class="secondary" data-mode="description">Select Description</button>
+        </div>
+        <iframe id="selector-iframe" class="modal-iframe" sandbox="allow-same-origin allow-scripts"></iframe>
+      </div>
+    </div>
 
     <script>
       const state = {
@@ -321,6 +402,81 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       document.getElementById("new-feed-scraped").addEventListener("change", (event) => {
         const scrapedFields = document.getElementById("scraped-fields");
         scrapedFields.style.display = event.target.checked ? "block" : "none";
+      });
+
+      // Selector builder modal
+      const modal = document.getElementById("selector-modal");
+      const iframe = document.getElementById("selector-iframe");
+      let currentMode = "title";
+      let selectionScript = null;
+
+      document.getElementById("build-selectors-btn").addEventListener("click", () => {
+        const url = document.getElementById("new-feed-url").value;
+        if (!url) {
+          showToast("Please enter a URL first", true);
+          return;
+        }
+        window.currentEditFeedId = null; // Clear edit mode
+        modal.classList.add("visible");
+        iframe.src = "/api/selector-preview?url=" + encodeURIComponent(url);
+      });
+
+      document.getElementById("close-modal").addEventListener("click", () => {
+        modal.classList.remove("visible");
+        iframe.src = "about:blank";
+      });
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.remove("visible");
+          iframe.src = "about:blank";
+        }
+      });
+
+      document.querySelectorAll(".selector-mode button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".selector-mode button").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          currentMode = btn.dataset.mode;
+          // Send mode change to iframe
+          if (iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: "setMode", mode: currentMode }, "*");
+          }
+        });
+      });
+
+      // Listen for selector messages from iframe
+      window.addEventListener("message", (event) => {
+        if (event.data.type === "selector") {
+          const { mode, selector } = event.data;
+          
+          // Check if we're editing an existing feed
+          if (window.currentEditFeedId) {
+            const feedCard = document.querySelector(\`[data-feed-id="\${window.currentEditFeedId}"]\`);
+            if (feedCard) {
+              const fieldMap = {
+                title: "titleSelector",
+                link: "linkSelector",
+                description: "descriptionSelector"
+              };
+              const input = feedCard.querySelector(\`input[data-field="\${fieldMap[mode]}"]\`);
+              if (input) {
+                input.value = selector;
+              }
+            }
+          } else {
+            // New feed form
+            if (mode === "title") {
+              document.getElementById("new-feed-title-selector").value = selector;
+            } else if (mode === "link") {
+              document.getElementById("new-feed-link-selector").value = selector;
+            } else if (mode === "description") {
+              document.getElementById("new-feed-desc-selector").value = selector;
+            }
+          }
+          
+          showToast(\`\${mode.charAt(0).toUpperCase() + mode.slice(1)} selector set: \${selector}\`);
+        }
       });
 
       document.getElementById("add-feed-form").addEventListener("submit", async (event) => {
@@ -405,6 +561,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           .forEach((feed) => {
             const wrapper = document.createElement("div");
             wrapper.className = "feed-card";
+            wrapper.setAttribute("data-feed-id", feed.id);
             wrapper.innerHTML = \`
               <header>
                 <h3>\${escapeHtml(feed.title)}\${feed.group ? " <span class=\\"chip\\" style=\\"margin-left:0.5rem;font-size:0.75rem;\\">" + escapeHtml(feed.group) + "</span>" : ""}</h3>
@@ -441,6 +598,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label style="margin:0;">Scrape website</label>
                 </div>
                 <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "block" : "none"}; grid-column: 1 / -1;">
+                  <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0.75rem;">🔍 Build Selectors Interactively</button>
                   <div>
                     <label>Title selector</label>
                     <input data-field="titleSelector" value="\${feed.titleSelector || ""}" placeholder="h3, .title" />
@@ -470,6 +628,24 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 if (scrapedFields) {
                   scrapedFields.style.display = e.target.checked ? "block" : "none";
                 }
+              });
+            }
+
+            // Build selectors button for edit form
+            const buildSelectorsBtn = wrapper.querySelector(".build-selectors-edit-btn");
+            if (buildSelectorsBtn) {
+              buildSelectorsBtn.addEventListener("click", () => {
+                const url = buildSelectorsBtn.dataset.feedUrl;
+                if (!url) {
+                  showToast("Feed URL not found", true);
+                  return;
+                }
+                modal.classList.add("visible");
+                iframe.src = "/api/selector-preview?url=" + encodeURIComponent(url);
+                
+                // Store reference to this feed's inputs for updating
+                const feedId = feed.id;
+                window.currentEditFeedId = feedId;
               });
             }
 

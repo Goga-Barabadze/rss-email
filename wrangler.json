@@ -4,7 +4,7 @@
   "name": "rss-email",
   "upload_source_maps": true,
   "triggers": {
-    "crons": ["*/15 * * * *"]
+    "crons": ["*/30 * * * *"]
   },
   "kv_namespaces": [
     {

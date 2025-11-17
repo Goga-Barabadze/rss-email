@@ -707,9 +707,9 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label>Link prefix</label>
                   <input data-field="linkPrefix" value="\${feed.linkPrefix || ""}" placeholder="https://archive.is/" />
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;">
                   <input type="checkbox" data-field="isScrapedFeed" \${feed.isScrapedFeed ? "checked" : ""} />
-                  <label style="margin:0;">Scrape website</label>
+                  <label style="margin:0;">Scrape website (not RSS feed)</label>
                 </div>
                 <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "block" : "none"}; grid-column: 1 / -1;">
                   <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0.75rem;">Build Selectors Interactively</button>

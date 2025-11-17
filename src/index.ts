@@ -552,20 +552,13 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
   const baseUrl = new URL(feed.url);
   const items: ParsedItem[] = [];
   
-  // Collect elements using HTMLRewriter
-  const titleElements: Array<{ text: string; order: number }> = [];
-  const linkElements: Array<{ href: string; order: number }> = [];
-  const descElements: Array<{ text: string; order: number }> = [];
-  
-  let titleOrder = 0;
-  let linkOrder = 0;
-  let descOrder = 0;
-
   // Use HTMLRewriter to extract content
   const titleTexts: string[] = [];
   const descTexts: string[] = [];
   let currentTitleIdx = -1;
   let currentDescIdx = -1;
+  const linkElements: Array<{ href: string; order: number }> = [];
+  let linkOrder = 0;
   
   const rewriter = new HTMLRewriter()
     .on(feed.titleSelector, {
@@ -574,7 +567,7 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
         titleTexts.push("");
       },
       text(text) {
-        if (currentTitleIdx >= 0) {
+        if (currentTitleIdx >= 0 && currentTitleIdx < titleTexts.length) {
           titleTexts[currentTitleIdx] += text.text;
         }
       },
@@ -583,8 +576,12 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
       element(element) {
         const href = element.getAttribute("href");
         if (href) {
-          const absoluteUrl = href.startsWith("http") ? href : new URL(href, baseUrl).toString();
-          linkElements.push({ href: absoluteUrl, order: linkOrder++ });
+          try {
+            const absoluteUrl = href.startsWith("http") ? href : new URL(href, baseUrl).toString();
+            linkElements.push({ href: absoluteUrl, order: linkOrder++ });
+          } catch (e) {
+            // Skip invalid URLs
+          }
         }
       },
     });
@@ -596,29 +593,60 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
         descTexts.push("");
       },
       text(text) {
-        if (currentDescIdx >= 0) {
+        if (currentDescIdx >= 0 && currentDescIdx < descTexts.length) {
           descTexts[currentDescIdx] += text.text;
         }
       },
     });
   }
 
-  // Process the HTML stream
-  await rewriter.transform(response).arrayBuffer();
+  // Process the HTML stream - must use the response directly, not text()
+  try {
+    await rewriter.transform(response).arrayBuffer();
+  } catch (error) {
+    throw new Error(`Failed to parse HTML: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 
   // Convert title texts to elements with order
+  const titleElements: Array<{ text: string; order: number }> = [];
   titleTexts.forEach((text, idx) => {
-    if (text.trim()) {
-      titleElements.push({ text: text.trim(), order: idx });
+    const trimmed = text.trim();
+    if (trimmed) {
+      titleElements.push({ text: trimmed, order: idx });
     }
   });
 
   // Convert desc texts to elements with order
+  const descElements: Array<{ text: string; order: number }> = [];
   descTexts.forEach((text, idx) => {
-    if (text.trim()) {
-      descElements.push({ text: text.trim(), order: idx });
+    const trimmed = text.trim();
+    if (trimmed) {
+      descElements.push({ text: trimmed, order: idx });
     }
   });
+
+  // Provide helpful error message if nothing found
+  if (titleElements.length === 0 && linkElements.length === 0) {
+    throw new Error(
+      `No elements found. Title selector "${feed.titleSelector}" found ${titleTexts.length} elements, ` +
+      `Link selector "${feed.linkSelector}" found ${linkElements.length} elements. ` +
+      `Please verify your selectors are correct.`
+    );
+  }
+
+  if (titleElements.length === 0) {
+    throw new Error(
+      `No titles found with selector "${feed.titleSelector}". Found ${titleTexts.length} elements but all were empty. ` +
+      `Please check that your title selector matches elements with text content.`
+    );
+  }
+
+  if (linkElements.length === 0) {
+    throw new Error(
+      `No links found with selector "${feed.linkSelector}". ` +
+      `Please check that your link selector matches <a> tags or elements with href attributes.`
+    );
+  }
 
   // Match items by order (assuming they appear in the same sequence)
   const maxItems = Math.max(titleElements.length, linkElements.length);
@@ -627,6 +655,7 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
     const linkEl = linkElements[i];
     const descEl = descElements[i];
 
+    // We need at least a title and link
     if (titleEl && linkEl) {
       const title = stripHtml(titleEl.text).trim();
       const link = linkEl.href;
@@ -641,11 +670,25 @@ async function scrapeFeedItems(feed: StoredFeed): Promise<ParsedItem[]> {
           published: undefined,
         });
       }
+    } else if (linkEl && !titleEl) {
+      // If we have a link but no title, try to use the link text or URL
+      const link = linkEl.href;
+      const linkText = link.split("/").pop() || link;
+      items.push({
+        id: `${feed.id}:${i}:${await hashIdentifier(link)}`,
+        title: linkText,
+        link,
+        summary: descElements[i] ? stripHtml(descElements[i].text).trim() : undefined,
+        published: undefined,
+      });
     }
   }
 
   if (items.length === 0) {
-    throw new Error("No items found with the provided selectors");
+    throw new Error(
+      `Found ${titleElements.length} titles and ${linkElements.length} links, but couldn't match them into items. ` +
+      `This might mean the elements aren't in the same order. Try using more specific selectors or a container selector.`
+    );
   }
 
   return items;

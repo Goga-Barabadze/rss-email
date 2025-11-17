@@ -267,9 +267,9 @@ async function handleSelectorPreview(request: Request): Promise<Response> {
           const style = document.createElement("style");
           style.textContent = \`
             .rss-selector-highlight {
-              outline: 3px solid #2563eb !important;
+              outline: 3px solid #666 !important;
               outline-offset: 2px !important;
-              background-color: rgba(37, 99, 235, 0.1) !important;
+              background-color: rgba(0, 0, 0, 0.05) !important;
               cursor: pointer !important;
             }
             body * {
@@ -333,7 +333,7 @@ async function handleSelectorPreview(request: Request): Promise<Response> {
             }, "*");
             
             // Visual feedback
-            element.style.outline = "3px solid #10b981";
+            element.style.outline = "3px solid #333";
             setTimeout(() => {
               element.style.outline = "";
             }, 1000);
@@ -786,9 +786,9 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
             const formattedDate = formatDateForEmail(item.published);
             const cleanSummary = item.summary ? stripHtml(item.summary) : "";
             return `<div style="margin-bottom: 1.2rem;">
-              <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: #2563eb; font-size: 1.1em;">${escapeHtml(item.title)}</a>${
-              formattedDate ? ` <span style="color: #6b7280; font-size: 1.08em;">${escapeHtml(formattedDate)}</span>` : ""
-            }${cleanSummary ? `<p style="margin-top: 0.5rem; color: #4b5563; font-size: 1.14em;">${escapeHtml(cleanSummary)}</p>` : ""}
+              <a href="${escapeHtml(prefixedLink)}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: underline; color: #1a1a1a; font-size: 1.1em;">${escapeHtml(item.title)}</a>${
+              formattedDate ? ` <span style="color: #666; font-size: 1.08em;">${escapeHtml(formattedDate)}</span>` : ""
+            }${cleanSummary ? `<p style="margin-top: 0.5rem; color: #666; font-size: 1.14em;">${escapeHtml(cleanSummary)}</p>` : ""}
             </div>`;
           }
         )

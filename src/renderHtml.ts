@@ -34,8 +34,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
     <style>
       :root {
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #0f172a;
-        background: #030712;
+        color: #1a1a1a;
+        background: #ffffff;
       }
       * {
         box-sizing: border-box;
@@ -43,7 +43,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       body {
         margin: 0;
         min-height: 100vh;
-        background: radial-gradient(circle at 10% 20%, #111827 0%, #030712 60%);
+        background: #ffffff;
         color: inherit;
       }
       .app-shell {
@@ -59,7 +59,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         margin-bottom: 2rem;
       }
       .hero {
-        color: #f8fafc;
+        color: #1a1a1a;
       }
       .hero h1 {
         margin: 0 0 0.35rem;
@@ -68,25 +68,25 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       }
       .hero p {
         margin: 0;
-        opacity: 0.85;
+        opacity: 0.7;
       }
       .subtext {
         font-size: 0.95rem;
-        color: #cbd5f5;
+        color: #666;
       }
       .btn-ghost {
-        border: 1px solid rgba(248, 250, 252, 0.3);
+        border: 1px solid #ccc;
         background: transparent;
-        color: #f8fafc;
+        color: #1a1a1a;
         padding: 0.5rem 1rem;
-        border-radius: 999px;
-        font-weight: 600;
+        border-radius: 4px;
+        font-weight: 500;
         cursor: pointer;
         transition: background 180ms ease, border-color 180ms ease;
       }
       .btn-ghost:hover {
-        background: rgba(248, 250, 252, 0.08);
-        border-color: rgba(248, 250, 252, 0.6);
+        background: #f5f5f5;
+        border-color: #999;
       }
       .grid {
         display: grid;
@@ -94,81 +94,88 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         gap: 1.25rem;
       }
       .panel {
-        background: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 1.25rem;
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
         padding: 1.5rem;
-        backdrop-filter: blur(12px);
-        box-shadow: 0 30px 60px rgba(2, 6, 23, 0.35);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
       .panel h2 {
         margin: 0 0 0.75rem;
         font-size: 1.2rem;
         letter-spacing: -0.01em;
-        color: #f8fafc;
+        color: #1a1a1a;
       }
       .panel p {
         margin: 0 0 1.25rem;
-        color: #94a3b8;
+        color: #666;
       }
       label {
         display: block;
-        color: #cbd5f5;
+        color: #333;
         margin-bottom: 0.35rem;
         font-size: 0.85rem;
       }
       input {
         width: 100%;
-        border-radius: 0.85rem;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: rgba(15, 23, 42, 0.6);
-        color: #f8fafc;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        background: #ffffff;
+        color: #1a1a1a;
         padding: 0.75rem 0.9rem;
         font-size: 1rem;
         margin-bottom: 0.75rem;
-        transition: border 150ms ease, background 150ms ease;
+        transition: border 150ms ease;
       }
       input:focus {
         outline: none;
-        border-color: rgba(248, 250, 252, 0.6);
-        background: rgba(15, 23, 42, 0.85);
+        border-color: #666;
       }
       button.primary {
-        border: none;
-        border-radius: 999px;
+        border: 1px solid #1a1a1a;
+        border-radius: 4px;
         padding: 0.8rem 1.75rem;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 0.35rem;
-        background: linear-gradient(120deg, #2563eb, #7c3aed);
-        color: #fff;
-        box-shadow: 0 15px 30px rgba(37, 99, 235, 0.4);
-        transition: transform 180ms ease, box-shadow 180ms ease;
+        background: #1a1a1a;
+        color: #ffffff;
+        transition: background 180ms ease, border-color 180ms ease;
       }
       button.primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 25px 45px rgba(37, 99, 235, 0.45);
+        background: #333;
+        border-color: #333;
       }
       button.secondary {
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        border-radius: 999px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
         padding: 0.65rem 1.5rem;
-        background: transparent;
-        color: #e2e8f0;
-        font-weight: 600;
+        background: #ffffff;
+        color: #1a1a1a;
+        font-weight: 500;
         cursor: pointer;
+        transition: background 150ms ease, border-color 150ms ease;
+      }
+      button.secondary:hover {
+        background: #f5f5f5;
+        border-color: #999;
       }
       button.danger {
-        border: none;
-        border-radius: 999px;
+        border: 1px solid #999;
+        border-radius: 4px;
         padding: 0.6rem 1.3rem;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
-        background: rgba(239, 68, 68, 0.15);
-        color: #fecaca;
+        background: #ffffff;
+        color: #1a1a1a;
+        transition: background 150ms ease, border-color 150ms ease;
+      }
+      button.danger:hover {
+        background: #f5f5f5;
+        border-color: #666;
       }
       .feeds-list {
         display: flex;
@@ -177,10 +184,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         margin-top: 1rem;
       }
       .feed-card {
-        border-radius: 1rem;
+        border-radius: 4px;
         padding: 1.25rem;
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(148, 163, 184, 0.12);
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
         display: flex;
         flex-direction: column;
         gap: 0.85rem;
@@ -194,11 +201,11 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       .feed-card h3 {
         margin: 0;
         font-size: 1.05rem;
-        color: #f8fafc;
+        color: #1a1a1a;
       }
       .feed-meta {
         font-size: 0.85rem;
-        color: #94a3b8;
+        color: #666;
       }
       .inline-form {
         display: grid;
@@ -210,14 +217,14 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         align-items: center;
         gap: 0.35rem;
         padding: 0.45rem 0.85rem;
-        background: rgba(37, 99, 235, 0.15);
-        border-radius: 999px;
-        color: #bfdbfe;
+        background: #f5f5f5;
+        border-radius: 4px;
+        color: #333;
         font-size: 0.85rem;
       }
       .status {
         font-size: 0.9rem;
-        color: #cbd5f5;
+        color: #666;
       }
       #toast {
         position: fixed;
@@ -225,10 +232,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         right: 1.5rem;
         min-width: 220px;
         padding: 0.9rem 1.2rem;
-        border-radius: 0.9rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: #f8fafc;
-        box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+        border-radius: 4px;
+        background: #1a1a1a;
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         opacity: 0;
         pointer-events: none;
         transform: translateY(20px);
@@ -239,7 +246,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         transform: translateY(0);
       }
       #toast.error {
-        background: rgba(185, 28, 28, 0.9);
+        background: #666;
       }
       #selector-modal {
         display: none;
@@ -248,7 +255,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.5);
         z-index: 1000;
         padding: 2rem;
         overflow: auto;
@@ -259,7 +266,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       }
       .modal-content {
         background: #fff;
-        border-radius: 1rem;
+        border-radius: 4px;
         padding: 1.5rem;
         max-width: 90vw;
         max-height: 90vh;
@@ -267,6 +274,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        border: 1px solid #e0e0e0;
       }
       .modal-header {
         display: flex;
@@ -276,13 +284,13 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       .modal-iframe {
         width: 100%;
         height: 60vh;
-        border: 2px solid #e2e8f0;
-        border-radius: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
       }
       .selector-instructions {
-        background: #f1f5f9;
+        background: #f5f5f5;
         padding: 1rem;
-        border-radius: 0.5rem;
+        border-radius: 4px;
         font-size: 0.9em;
       }
       .selector-mode {
@@ -295,7 +303,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         font-size: 0.9em;
       }
       .selector-mode button.active {
-        background: #2563eb;
+        background: #1a1a1a;
         color: #fff;
       }
       .preview-item {
@@ -314,21 +322,21 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         color: #1e293b;
       }
       .preview-item-title a {
-        color: #2563eb;
-        text-decoration: none;
+        color: #1a1a1a;
+        text-decoration: underline;
       }
       .preview-item-title a:hover {
-        text-decoration: underline;
+        text-decoration: none;
       }
       .preview-item-link {
         font-size: 0.9em;
-        color: #64748b;
+        color: #666;
         margin-bottom: 0.5rem;
         word-break: break-all;
       }
       .preview-item-description {
         font-size: 0.9em;
-        color: #475569;
+        color: #666;
         line-height: 1.5;
       }
       @media (max-width: 720px) {
@@ -376,8 +384,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             </label>
             <div id="scraped-fields" style="display: none; margin-top: 0.75rem;">
               <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
-                <button type="button" class="secondary" id="build-selectors-btn">🔍 Build Selectors Interactively</button>
-                <button type="button" class="secondary" id="preview-items-btn">👁️ Preview Items</button>
+                <button type="button" class="secondary" id="build-selectors-btn">Build Selectors Interactively</button>
+                <button type="button" class="secondary" id="preview-items-btn">Preview Items</button>
               </div>
               <label for="new-feed-title-selector">Title CSS selector</label>
               <input id="new-feed-title-selector" name="titleSelector" placeholder="h3, .title, #news-title" />
@@ -385,11 +393,11 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               <input id="new-feed-link-selector" name="linkSelector" placeholder="a, .link, a.article-link" />
               <label for="new-feed-desc-selector">Description CSS selector (optional)</label>
               <input id="new-feed-desc-selector" name="descriptionSelector" placeholder="p, .description, .summary" />
-              <div id="preview-section" style="display: none; margin-top: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 0.5rem;">
+              <div id="preview-section" style="display: none; margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px; border: 1px solid #e0e0e0;">
                 <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.1em;">Preview (first 3 items):</h3>
                 <div id="preview-items"></div>
-                <div id="preview-loading" style="display: none; color: #64748b;">Loading preview...</div>
-                <div id="preview-error" style="display: none; color: #dc2626;"></div>
+                <div id="preview-loading" style="display: none; color: #666;">Loading preview...</div>
+                <div id="preview-error" style="display: none; color: #666;"></div>
               </div>
             </div>
             <button class="primary" type="submit">Save feed</button>
@@ -711,7 +719,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label style="margin:0;">Scrape website</label>
                 </div>
                 <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "block" : "none"}; grid-column: 1 / -1;">
-                  <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0.75rem;">🔍 Build Selectors Interactively</button>
+                  <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0.75rem;">Build Selectors Interactively</button>
                   <div>
                     <label>Title selector</label>
                     <input data-field="titleSelector" value="\${feed.titleSelector || ""}" placeholder="h3, .title" />

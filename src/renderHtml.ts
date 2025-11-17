@@ -198,6 +198,15 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         gap: 0.35rem;
         margin: 0;
       }
+      .feed-header {
+        transition: background-color 150ms ease;
+        padding: 0.5rem;
+        margin: -0.5rem;
+        border-radius: 4px;
+      }
+      .feed-header:hover {
+        background-color: #f5f5f5;
+      }
       .feed-card h3 {
         margin: 0;
         font-size: 1.05rem;
@@ -677,7 +686,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             wrapper.className = "feed-card";
             wrapper.setAttribute("data-feed-id", feed.id);
             wrapper.innerHTML = \`
-              <header>
+              <header class="feed-header" style="cursor: pointer;">
                 <h3>\${escapeHtml(feed.title)}\${feed.group ? " <span class=\\"chip\\" style=\\"margin-left:0.5rem;font-size:0.75rem;\\">" + escapeHtml(feed.group) + "</span>" : ""}</h3>
                 <a class="feed-meta" href="\${escapeHtml(feed.url)}" target="_blank" rel="noopener">\${escapeHtml(feed.url)}</a>
                 <p class="feed-meta">
@@ -686,7 +695,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   Interval: \${feed.intervalMinutes || 60} min\${feed.linkPrefix ? " | Prefix: " + escapeHtml(feed.linkPrefix) : ""} | Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
                 </p>
               </header>
-              <div class="inline-form">
+              <div class="inline-form feed-edit-form" style="display: none;">
                 <div>
                   <label>Title</label>
                   <input data-field="title" value="\${feed.title}" />
@@ -733,6 +742,27 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               </div>
               <p class="status">\${feed.lastRunSummary || "Not run yet"}</p>
             \`;
+
+            // Toggle edit form on header click
+            const feedHeader = wrapper.querySelector(".feed-header");
+            const editForm = wrapper.querySelector(".feed-edit-form");
+            if (feedHeader && editForm) {
+              feedHeader.addEventListener("click", (e) => {
+                // Don't toggle if clicking on a link
+                if (e.target.tagName === "A") {
+                  return;
+                }
+                const isVisible = editForm.style.display !== "none";
+                editForm.style.display = isVisible ? "none" : "block";
+              });
+            }
+            
+            // Stop propagation on edit form clicks
+            if (editForm) {
+              editForm.addEventListener("click", (e) => {
+                e.stopPropagation();
+              });
+            }
 
             // Toggle scraped fields in edit form
             const scrapedCheckbox = wrapper.querySelector('input[data-field="isScrapedFeed"]');

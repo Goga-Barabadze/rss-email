@@ -759,9 +759,14 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               });
             }
             
-            // Stop propagation on edit form clicks
+            // Stop propagation on edit form clicks (but allow buttons to work)
             if (editForm) {
               editForm.addEventListener("click", (e) => {
+                // Don't stop propagation for buttons - they need to bubble to wrapper handler
+                const target = e.target;
+                if (target instanceof HTMLElement && (target.tagName === "BUTTON" || target.dataset.action)) {
+                  return;
+                }
                 e.stopPropagation();
               });
             }

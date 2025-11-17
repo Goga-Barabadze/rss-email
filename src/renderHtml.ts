@@ -716,12 +716,14 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label>Link prefix</label>
                   <input data-field="linkPrefix" value="\${feed.linkPrefix || ""}" placeholder="https://archive.is/" />
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;">
-                  <input type="checkbox" data-field="isScrapedFeed" \${feed.isScrapedFeed ? "checked" : ""} />
-                  <label style="margin:0;">Scrape website (not RSS feed)</label>
+                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
+                  <input type="checkbox" data-field="isScrapedFeed" id="edit-feed-scraped-\${feed.id}" \${feed.isScrapedFeed ? "checked" : ""} />
+                  <label for="edit-feed-scraped-\${feed.id}" style="margin:0;">Scrape website (not RSS feed)</label>
                 </div>
-                <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "block" : "none"}; grid-column: 1 / -1;">
-                  <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0.75rem;">Build Selectors Interactively</button>
+                <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "grid" : "none"}; grid-column: 1 / -1; margin-top: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+                  <div style="grid-column: 1 / -1;">
+                    <button type="button" class="secondary build-selectors-edit-btn" data-feed-url="\${escapeHtml(feed.url)}" style="margin-bottom: 0;">Build Selectors Interactively</button>
+                  </div>
                   <div>
                     <label>Title selector</label>
                     <input data-field="titleSelector" value="\${feed.titleSelector || ""}" placeholder="h3, .title" />
@@ -770,7 +772,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             if (scrapedCheckbox) {
               scrapedCheckbox.addEventListener("change", (e) => {
                 if (scrapedFields) {
-                  scrapedFields.style.display = e.target.checked ? "block" : "none";
+                  scrapedFields.style.display = e.target.checked ? "grid" : "none";
                 }
               });
             }

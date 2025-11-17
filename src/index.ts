@@ -62,6 +62,10 @@ export default {
       return handleSelectorPreview(request);
     }
 
+    if (pathname === "/api/preview-items" && request.method === "POST") {
+      return handlePreviewItems(request);
+    }
+
     if (pathname.startsWith("/api/feeds")) {
       return handleFeedApi(request, env, pathname);
     }
@@ -353,6 +357,48 @@ async function handleSelectorPreview(request: Request): Promise<Response> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(`Error: ${message}`, { status: 500 });
+  }
+}
+
+async function handlePreviewItems(request: Request): Promise<Response> {
+  try {
+    const body = await readJson<{
+      url: string;
+      titleSelector: string;
+      linkSelector: string;
+      descriptionSelector?: string;
+    }>(request);
+
+    if (!body?.url || !body?.titleSelector || !body?.linkSelector) {
+      return jsonResponse({ error: "url, titleSelector, and linkSelector are required" }, 400);
+    }
+
+    // Create a temporary feed object for scraping
+    const tempFeed: StoredFeed = {
+      id: "preview",
+      title: "Preview",
+      url: body.url,
+      createdAt: new Date().toISOString(),
+      isScrapedFeed: true,
+      titleSelector: body.titleSelector,
+      linkSelector: body.linkSelector,
+      descriptionSelector: body.descriptionSelector,
+    };
+
+    // Use the same scraping function
+    const items = await scrapeFeedItems(tempFeed);
+
+    // Return first 3 items
+    return jsonResponse({
+      items: items.slice(0, 3).map((item) => ({
+        title: item.title,
+        link: item.link,
+        summary: item.summary,
+      })),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return jsonResponse({ error: message }, 500);
   }
 }
 

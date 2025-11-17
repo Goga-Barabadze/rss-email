@@ -298,6 +298,39 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         background: #2563eb;
         color: #fff;
       }
+      .preview-item {
+        background: #fff;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+      }
+      .preview-item:last-child {
+        margin-bottom: 0;
+      }
+      .preview-item-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1e293b;
+      }
+      .preview-item-title a {
+        color: #2563eb;
+        text-decoration: none;
+      }
+      .preview-item-title a:hover {
+        text-decoration: underline;
+      }
+      .preview-item-link {
+        font-size: 0.9em;
+        color: #64748b;
+        margin-bottom: 0.5rem;
+        word-break: break-all;
+      }
+      .preview-item-description {
+        font-size: 0.9em;
+        color: #475569;
+        line-height: 1.5;
+      }
       @media (max-width: 720px) {
         header {
           flex-direction: column;
@@ -342,13 +375,22 @@ export function renderHtml({ feeds, recipient }: PageProps) {
               <span>Scrape website (not RSS feed)</span>
             </label>
             <div id="scraped-fields" style="display: none; margin-top: 0.75rem;">
-              <button type="button" class="secondary" id="build-selectors-btn" style="margin-bottom: 0.75rem;">🔍 Build Selectors Interactively</button>
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <button type="button" class="secondary" id="build-selectors-btn">🔍 Build Selectors Interactively</button>
+                <button type="button" class="secondary" id="preview-items-btn">👁️ Preview Items</button>
+              </div>
               <label for="new-feed-title-selector">Title CSS selector</label>
               <input id="new-feed-title-selector" name="titleSelector" placeholder="h3, .title, #news-title" />
               <label for="new-feed-link-selector">Link CSS selector</label>
               <input id="new-feed-link-selector" name="linkSelector" placeholder="a, .link, a.article-link" />
               <label for="new-feed-desc-selector">Description CSS selector (optional)</label>
               <input id="new-feed-desc-selector" name="descriptionSelector" placeholder="p, .description, .summary" />
+              <div id="preview-section" style="display: none; margin-top: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 0.5rem;">
+                <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.1em;">Preview (first 3 items):</h3>
+                <div id="preview-items"></div>
+                <div id="preview-loading" style="display: none; color: #64748b;">Loading preview...</div>
+                <div id="preview-error" style="display: none; color: #dc2626;"></div>
+              </div>
             </div>
             <button class="primary" type="submit">Save feed</button>
           </form>
@@ -419,6 +461,77 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         window.currentEditFeedId = null; // Clear edit mode
         modal.classList.add("visible");
         iframe.src = "/api/selector-preview?url=" + encodeURIComponent(url);
+      });
+
+      document.getElementById("preview-items-btn").addEventListener("click", async () => {
+        const url = document.getElementById("new-feed-url").value;
+        const titleSelector = document.getElementById("new-feed-title-selector").value;
+        const linkSelector = document.getElementById("new-feed-link-selector").value;
+        const descSelector = document.getElementById("new-feed-desc-selector").value;
+
+        if (!url) {
+          showToast("Please enter a URL first", true);
+          return;
+        }
+        if (!titleSelector || !linkSelector) {
+          showToast("Please enter title and link selectors first", true);
+          return;
+        }
+
+        const previewSection = document.getElementById("preview-section");
+        const previewItems = document.getElementById("preview-items");
+        const previewLoading = document.getElementById("preview-loading");
+        const previewError = document.getElementById("preview-error");
+
+        previewSection.style.display = "block";
+        previewItems.innerHTML = "";
+        previewLoading.style.display = "block";
+        previewError.style.display = "none";
+
+        try {
+          const response = await fetch("/api/preview-items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url,
+              titleSelector,
+              linkSelector,
+              descriptionSelector: descSelector || undefined,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Failed to fetch preview");
+          }
+
+          const data = await response.json();
+          previewLoading.style.display = "none";
+
+          if (data.items && data.items.length > 0) {
+            previewItems.innerHTML = data.items
+              .slice(0, 3)
+              .map(
+                (item) => \`
+                  <div class="preview-item">
+                    <div class="preview-item-title">
+                      <a href="\${escapeHtml(item.link)}" target="_blank" rel="noopener">\${escapeHtml(item.title || "No title")}</a>
+                    </div>
+                    <div class="preview-item-link">\${escapeHtml(item.link)}</div>
+                    \${item.summary ? \`<div class="preview-item-description">\${escapeHtml(item.summary)}</div>\` : ""}
+                  </div>
+                \`,
+              )
+              .join("");
+          } else {
+            previewError.textContent = "No items found with the provided selectors";
+            previewError.style.display = "block";
+          }
+        } catch (error) {
+          previewLoading.style.display = "none";
+          previewError.textContent = error.message || "Failed to load preview";
+          previewError.style.display = "block";
+        }
       });
 
       document.getElementById("close-modal").addEventListener("click", () => {

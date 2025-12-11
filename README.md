@@ -28,7 +28,6 @@ Hourly Cloudflare Worker that polls multiple RSS/Atom feeds, deduplicates items,
    ```
    Update `wrangler.json` with the generated `id`/`preview_id` values (replace the placeholder strings currently committed).
 3. Mailtrap + app config (`wrangler.json` → `vars`)
-   - `MAILTRAP_INBOX_ID`: Your Mailtrap inbox ID (e.g. `123456`)
    - `MAILTRAP_FROM`: Sender email/name e.g. `RSS Worker <rss@example.com>` or just `rss@example.com`
    - `MAILTRAP_RECIPIENT`: defaults to `gobarabadze@gmail.com` but can be changed.
 4. Secrets
@@ -69,9 +68,10 @@ Responses are JSON and include job summaries: feeds checked, new items, and whet
 ## Mailtrap notes
 
 - API token stays secret: `wrangler secret put MAILTRAP_API_TOKEN`.
-- Inbox ID + sender live in `wrangler.json` vars (safe to commit).
+- Sender email/name live in `wrangler.json` vars (safe to commit).
 - The worker sends one message per run summarizing every new item; duplicates are prevented via hashed IDs stored in KV for ~30 days.
-- Get your API token and inbox ID from your [Mailtrap account](https://mailtrap.io/).
+- Get your API token from your [Mailtrap account](https://mailtrap.io/).
+- Uses Mailtrap Sending API to send emails to real recipients.
 
 ## Frontend quick tips
 

@@ -21,8 +21,7 @@
     }
   ],
   "vars": {
-    "MAILTRAP_INBOX_ID": "",
-    "MAILTRAP_FROM": "New Items <rss@example.com>",
+    "MAILTRAP_FROM": "New Items <rss@rss-mail.com>",
     "MAILTRAP_RECIPIENT": "gobarabadze@gmail.com"
   },
   "observability": {

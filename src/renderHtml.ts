@@ -23,10 +23,10 @@ interface PageProps {
 export function renderHtml({ feeds, recipient }: PageProps) {
   const initialFeeds = JSON.stringify(feeds).replace(/</g, "\\u003c");
   return `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RSS Email Worker</title>
     <link rel="preconnect" href="https://rsms.me/" />
@@ -354,9 +354,9 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         }
       }
     </style>
-  </head>
-
-  <body>
+      </head>
+    
+      <body>
     <main class="app-shell">
 
       <div class="grid">
@@ -694,7 +694,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <br />
                   Interval: \${feed.intervalMinutes || 60} min\${feed.linkPrefix ? " | Prefix: " + escapeHtml(feed.linkPrefix) : ""} | Last run: \${formatDate(feed.lastRunAt)} \${feed.lastRunSummary ? "| " + feed.lastRunSummary : ""}
                 </p>
-              </header>
+        </header>
               <div class="inline-form feed-edit-form" style="display: none;">
                 <div>
                   <label>Title</label>
@@ -886,8 +886,8 @@ export function renderHtml({ feeds, recipient }: PageProps) {
 
       renderFeeds();
     </script>
-  </body>
-</html>
+      </body>
+    </html>
 `;
 }
 

@@ -4,7 +4,6 @@ import { renderHtml, type FeedPageDataFeed } from "./renderHtml";
 interface Env {
   FEEDS_KV: KVNamespace;
   MAILTRAP_API_TOKEN: string;
-  MAILTRAP_INBOX_ID: string;
   MAILTRAP_FROM: string;
   MAILTRAP_RECIPIENT: string;
 }
@@ -756,9 +755,6 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
   if (!env.MAILTRAP_API_TOKEN) {
     throw new Error("MAILTRAP_API_TOKEN missing");
   }
-  if (!env.MAILTRAP_INBOX_ID) {
-    throw new Error("MAILTRAP_INBOX_ID missing");
-  }
 
   // Determine display name: use group name if set and not "default", otherwise use feed name
   const displayName = groupName && groupName !== "default" 
@@ -832,7 +828,7 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
   };
 
   const response = await fetch(
-    `https://send.api.mailtrap.io/api/send/${env.MAILTRAP_INBOX_ID}`,
+    `https://send.api.mailtrap.io/api/send`,
     {
       method: "POST",
       headers: {

@@ -802,7 +802,15 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
     );
   }
 
-  htmlParts.push("</div>");
+  // Add "Manage Items" link at the bottom
+  htmlParts.push(
+    `<div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center;">
+      <a href="https://rss-email.gobarabadze-51f.workers.dev" style="color: #666; font-size: 0.9em; text-decoration: none;">Manage Items</a>
+    </div></div>`
+  );
+
+  // Add to text version as well
+  textParts.push(`\n\nManage Items: https://rss-email.gobarabadze-51f.workers.dev`);
 
   // Parse MAILTRAP_FROM format: "Name <email@example.com>" or just "email@example.com"
   let fromEmail = env.MAILTRAP_FROM;

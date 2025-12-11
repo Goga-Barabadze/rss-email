@@ -1,19 +1,19 @@
 # RSS Email Worker
 
-Hourly Cloudflare Worker that polls multiple RSS/Atom feeds, deduplicates items, and sends an email digest through Mailgun. A lightweight frontend (served from the Worker) lets you manage feeds and run the job immediately.
+Hourly Cloudflare Worker that polls multiple RSS/Atom feeds, deduplicates items, and sends an email digest through Mailtrap. A lightweight frontend (served from the Worker) lets you manage feeds and run the job immediately.
 
 ## Features
 
 - Store feeds plus sent-item hashes in Cloudflare KV.
-- Scheduled cron (`0 * * * *`) fetches all feeds hourly.
-- Mailgun integration (HTML + plain-text digest) to `gobarabadze@gmail.com`.
-- Frontend CRUD (add/update/delete feeds) and “Run Now” button.
+- Scheduled cron (`*/30 * * * *`) fetches all feeds every 30 minutes.
+- Mailtrap integration (HTML + plain-text digest) to `gobarabadze@gmail.com`.
+- Frontend CRUD (add/update/delete feeds) and "Run Now" button.
 - Optional `MANAGEMENT_API_KEY` header to guard mutations/manual runs.
 
 ## Prerequisites
 
 - `wrangler` 4.21+
-- Mailgun domain + API key with permission to send from `MAILGUN_FROM`.
+- Mailtrap account with API token and inbox ID.
 
 ## Configuration
 
@@ -27,13 +27,13 @@ Hourly Cloudflare Worker that polls multiple RSS/Atom feeds, deduplicates items,
    npx wrangler kv namespace create FEEDS_KV --preview
    ```
    Update `wrangler.json` with the generated `id`/`preview_id` values (replace the placeholder strings currently committed).
-3. Mailgun + app config (`wrangler.json` → `vars`)
-   - `MAILGUN_DOMAIN`: e.g. `mg.example.com`
-   - `MAILGUN_FROM`: any verified sender e.g. `RSS Worker <rss@example.com>`
-   - `MAILGUN_RECIPIENT`: defaults to `gobarabadze@gmail.com` but can be changed.
+3. Mailtrap + app config (`wrangler.json` → `vars`)
+   - `MAILTRAP_INBOX_ID`: Your Mailtrap inbox ID (e.g. `123456`)
+   - `MAILTRAP_FROM`: Sender email/name e.g. `RSS Worker <rss@example.com>` or just `rss@example.com`
+   - `MAILTRAP_RECIPIENT`: defaults to `gobarabadze@gmail.com` but can be changed.
 4. Secrets
    ```bash
-   wrangler secret put MAILGUN_API_KEY
+   wrangler secret put MAILTRAP_API_TOKEN
    wrangler secret put MANAGEMENT_API_KEY   # required if you want to lock down the UI
    ```
    The `MANAGEMENT_API_KEY` is the value typed into the frontend and passed as the `X-Admin-Key` header. Leaving it unset keeps CRUD endpoints open (not recommended publicly).
@@ -64,13 +64,14 @@ curl -X POST https://<worker-host>/api/feeds \
   -d '{"title":"Example","url":"https://example.com/rss"}'
 ```
 
-Responses are JSON and include job summaries: feeds checked, new items, and whether Mailgun send succeeded.
+Responses are JSON and include job summaries: feeds checked, new items, and whether Mailtrap send succeeded.
 
-## Mailgun notes
+## Mailtrap notes
 
-- API key stays secret: `wrangler secret put MAILGUN_API_KEY`.
-- Domain + sender live in `wrangler.json` vars (safe to commit).
+- API token stays secret: `wrangler secret put MAILTRAP_API_TOKEN`.
+- Inbox ID + sender live in `wrangler.json` vars (safe to commit).
 - The worker sends one message per run summarizing every new item; duplicates are prevented via hashed IDs stored in KV for ~30 days.
+- Get your API token and inbox ID from your [Mailtrap account](https://mailtrap.io/).
 
 ## Frontend quick tips
 

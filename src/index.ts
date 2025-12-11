@@ -3,10 +3,10 @@ import { renderHtml, type FeedPageDataFeed } from "./renderHtml";
 
 interface Env {
   FEEDS_KV: KVNamespace;
-  MAILGUN_API_KEY: string;
-  MAILGUN_DOMAIN: string;
-  MAILGUN_FROM: string;
-  MAILGUN_RECIPIENT: string;
+  MAILTRAP_API_TOKEN: string;
+  MAILTRAP_INBOX_ID: string;
+  MAILTRAP_FROM: string;
+  MAILTRAP_RECIPIENT: string;
 }
 
 interface StoredFeed extends FeedPageDataFeed {}
@@ -79,7 +79,7 @@ export default {
     return new Response(
       renderHtml({
         feeds,
-        recipient: env.MAILGUN_RECIPIENT,
+        recipient: env.MAILTRAP_RECIPIENT,
       }),
       {
         headers: {
@@ -499,7 +499,7 @@ async function processFeeds(env: Env): Promise<JobResult> {
         for (const job of groupJobs) {
           job.feed.lastRunSummary = `Email failed: ${message}`;
         }
-        console.error(`Failed to send Mailgun email for group "${groupName}"`, error);
+        console.error(`Failed to send Mailtrap email for group "${groupName}"`, error);
       }
     }
   }
@@ -753,11 +753,11 @@ function toArray<T>(value: T | T[] | undefined | null): T[] {
 }
 
 async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string) {
-  if (!env.MAILGUN_API_KEY) {
-    throw new Error("MAILGUN_API_KEY missing");
+  if (!env.MAILTRAP_API_TOKEN) {
+    throw new Error("MAILTRAP_API_TOKEN missing");
   }
-  if (!env.MAILGUN_DOMAIN) {
-    throw new Error("MAILGUN_DOMAIN missing");
+  if (!env.MAILTRAP_INBOX_ID) {
+    throw new Error("MAILTRAP_INBOX_ID missing");
   }
 
   // Determine display name: use group name if set and not "default", otherwise use feed name
@@ -808,27 +808,44 @@ async function sendDigestEmail(env: Env, jobs: FeedJobItem[], groupName?: string
 
   htmlParts.push("</div>");
 
-  const params = new URLSearchParams();
-  params.append("from", env.MAILGUN_FROM);
-  params.append("to", env.MAILGUN_RECIPIENT);
-  params.append("subject", subject);
-  params.append("text", textParts.join("\n"));
-  params.append("html", htmlParts.join("\n"));
+  // Parse MAILTRAP_FROM format: "Name <email@example.com>" or just "email@example.com"
+  let fromEmail = env.MAILTRAP_FROM;
+  let fromName: string | undefined;
+  const fromMatch = env.MAILTRAP_FROM.match(/^(.+?)\s*<(.+?)>$/);
+  if (fromMatch) {
+    fromName = fromMatch[1].trim();
+    fromEmail = fromMatch[2].trim();
+  }
+
+  const payload: {
+    from: { email: string; name?: string } | string;
+    to: Array<{ email: string }>;
+    subject: string;
+    text: string;
+    html: string;
+  } = {
+    from: fromName ? { email: fromEmail, name: fromName } : fromEmail,
+    to: [{ email: env.MAILTRAP_RECIPIENT }],
+    subject: subject,
+    text: textParts.join("\n"),
+    html: htmlParts.join("\n"),
+  };
 
   const response = await fetch(
-    `https://api.mailgun.net/v3/${env.MAILGUN_DOMAIN}/messages`,
+    `https://send.api.mailtrap.io/api/send/${env.MAILTRAP_INBOX_ID}`,
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`api:${env.MAILGUN_API_KEY}`)}`,
+        "Authorization": `Bearer ${env.MAILTRAP_API_TOKEN}`,
+        "Content-Type": "application/json",
       },
-      body: params,
+      body: JSON.stringify(payload),
     },
   );
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Mailgun error (${response.status}): ${body}`);
+    throw new Error(`Mailtrap error (${response.status}): ${body}`);
   }
 }
 

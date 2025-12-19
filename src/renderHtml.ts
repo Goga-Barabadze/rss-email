@@ -9,10 +9,13 @@ export interface FeedPageDataFeed {
   titleSelector?: string;
   linkSelector?: string;
   descriptionSelector?: string;
+  maxAgeHours?: number;
+  decoupleFetchSend?: boolean;
   createdAt: string;
   updatedAt?: string;
   lastRunAt?: string;
   lastRunSummary?: string;
+  lastFetchAt?: string;
 }
 
 interface PageProps {
@@ -378,6 +381,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-group" name="group" placeholder="Tech, News, etc. (leave empty for default)" />
             <label for="new-feed-interval">Check interval (minutes)</label>
             <input id="new-feed-interval" name="intervalMinutes" type="number" min="1" value="60" placeholder="60" />
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <input type="checkbox" id="new-feed-decouple" name="decoupleFetchSend" />
+              <span>Decouple fetch and send (fetch frequently, send on interval)</span>
+            </label>
             <label for="new-feed-link-prefix">Link prefix (optional)</label>
             <input id="new-feed-link-prefix" name="linkPrefix" placeholder="https://archive.is/" />
             <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
@@ -616,6 +623,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
           titleSelector: isScraped ? form.titleSelector.value.trim() || undefined : undefined,
           linkSelector: isScraped ? form.linkSelector.value.trim() || undefined : undefined,
           descriptionSelector: isScraped ? form.descriptionSelector.value.trim() || undefined : undefined,
+          decoupleFetchSend: form.decoupleFetchSend?.checked || false,
         };
         try {
           const response = await fetch("/api/feeds", {
@@ -678,16 +686,44 @@ export function renderHtml({ feeds, recipient }: PageProps) {
         }
         emptyState.style.display = "none";
 
-        state.feeds
-          .slice()
-          .sort((a, b) => a.title.localeCompare(b.title))
-          .forEach((feed) => {
+        // Group feeds by their group field
+        const groups = new Map();
+        for (const feed of state.feeds) {
+          const groupKey = feed.group?.trim() || "default";
+          if (!groups.has(groupKey)) {
+            groups.set(groupKey, []);
+          }
+          groups.get(groupKey).push(feed);
+        }
+
+        // Sort groups: "default" first, then alphabetically
+        const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+          if (a[0] === "default") return -1;
+          if (b[0] === "default") return 1;
+          return a[0].localeCompare(b[0]);
+        });
+
+        // Render each group
+        for (const [groupName, groupFeeds] of sortedGroups) {
+          // Sort feeds within group by title
+          groupFeeds.sort((a, b) => a.title.localeCompare(b.title));
+
+          // Add group header if not "default" or if there are multiple groups
+          if (groupName !== "default" || sortedGroups.length > 1) {
+            const groupHeader = document.createElement("div");
+            groupHeader.style.cssText = "margin-top: 1.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e0e0e0;";
+            groupHeader.innerHTML = \`<h3 style="margin: 0; font-size: 1.3rem; color: #333; font-weight: 600;">\${escapeHtml(groupName === "default" ? "Default Group" : groupName)}</h3>\`;
+            container.appendChild(groupHeader);
+          }
+
+          // Render feeds in this group
+          groupFeeds.forEach((feed) => {
             const wrapper = document.createElement("div");
             wrapper.className = "feed-card";
             wrapper.setAttribute("data-feed-id", feed.id);
             wrapper.innerHTML = \`
               <header class="feed-header" style="cursor: pointer;">
-                <h3>\${escapeHtml(feed.title)}\${feed.group ? " <span class=\\"chip\\" style=\\"margin-left:0.5rem;font-size:0.75rem;\\">" + escapeHtml(feed.group) + "</span>" : ""}</h3>
+                <h3>\${escapeHtml(feed.title)}</h3>
                 <a class="feed-meta" href="\${escapeHtml(feed.url)}" target="_blank" rel="noopener">\${escapeHtml(feed.url)}</a>
                 <p class="feed-meta">
                   Created: \${formatDate(feed.createdAt)} \${feed.updatedAt ? "| Updated: " + formatDate(feed.updatedAt) : ""}
@@ -711,6 +747,10 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 <div>
                   <label>Interval (min)</label>
                   <input data-field="intervalMinutes" type="number" min="1" value="\${feed.intervalMinutes || 60}" />
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
+                  <input type="checkbox" data-field="decoupleFetchSend" id="edit-feed-decouple-\${feed.id}" \${feed.decoupleFetchSend ? "checked" : ""} />
+                  <label for="edit-feed-decouple-\${feed.id}" style="margin:0;">Decouple fetch and send (fetch frequently, send on interval)</label>
                 </div>
                 <div>
                   <label>Link prefix</label>
@@ -809,7 +849,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                 const payload = {};
                 inputs.forEach((input) => {
                   const field = input.dataset.field;
-                  if (field === "isScrapedFeed") {
+                  if (field === "isScrapedFeed" || field === "decoupleFetchSend") {
                     payload[field] = input.checked;
                   } else {
                     const value = input.value.trim();
@@ -852,6 +892,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
 
             container.appendChild(wrapper);
           });
+        }
       }
 
       function formatDate(value) {

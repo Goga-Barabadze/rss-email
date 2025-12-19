@@ -20,6 +20,8 @@ interface FeedInput {
   titleSelector?: string;
   linkSelector?: string;
   descriptionSelector?: string;
+  maxAgeHours?: number;
+  decoupleFetchSend?: boolean;
 }
 
 interface FeedJobItem {
@@ -47,6 +49,7 @@ interface JobResult {
 const FEEDS_KEY = "feeds:list";
 const SENT_PREFIX = "sent:";
 const SENT_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const BATCHING_WINDOW_MINUTES = 60; // Batch feeds in same group if they're ready within this window
 
 export default {
   async fetch(request, env, ctx) {
@@ -110,6 +113,17 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     const intervalMinutes = body.intervalMinutes !== undefined 
       ? Math.max(1, Math.floor(Number(body.intervalMinutes))) 
       : 60; // Default to 60 minutes (1 hour)
+    const maxAgeHours = body.maxAgeHours !== undefined
+      ? Math.max(1, Math.floor(Number(body.maxAgeHours)))
+      : undefined;
+    
+    // Validate that interval doesn't exceed maxAgeHours if set
+    if (maxAgeHours && intervalMinutes > maxAgeHours * 60) {
+      return jsonResponse({ 
+        error: `Check interval (${intervalMinutes} min) exceeds feed's max age (${maxAgeHours} hours). Items may be missed. Please set interval to ${maxAgeHours * 60} minutes or less.` 
+      }, 400);
+    }
+    
     const newFeed: StoredFeed = {
       id: crypto.randomUUID(),
       url: body.url.trim(),
@@ -121,6 +135,8 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
       titleSelector: body.titleSelector?.trim() || undefined,
       linkSelector: body.linkSelector?.trim() || undefined,
       descriptionSelector: body.descriptionSelector?.trim() || undefined,
+      maxAgeHours: maxAgeHours || undefined,
+      decoupleFetchSend: body.decoupleFetchSend || false,
       createdAt: new Date().toISOString(),
     };
     feeds.push(newFeed);
@@ -141,7 +157,7 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
 
   if (method === "PUT") {
     const body = (await readJson<FeedInput>(request)) ?? {};
-    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined && body.linkPrefix === undefined && body.isScrapedFeed === undefined && body.titleSelector === undefined && body.linkSelector === undefined && body.descriptionSelector === undefined) {
+    if (!body.url && !body.title && body.group === undefined && body.intervalMinutes === undefined && body.linkPrefix === undefined && body.isScrapedFeed === undefined && body.titleSelector === undefined && body.linkSelector === undefined && body.descriptionSelector === undefined && body.maxAgeHours === undefined && body.decoupleFetchSend === undefined) {
       return jsonResponse({ error: "Provide at least one field to update" }, 400);
     }
     if (body.url) {
@@ -156,6 +172,12 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     if (body.intervalMinutes !== undefined) {
       const intervalMinutes = Math.max(1, Math.floor(Number(body.intervalMinutes)));
       feeds[index].intervalMinutes = intervalMinutes > 0 ? intervalMinutes : 60;
+    }
+    if (body.maxAgeHours !== undefined) {
+      const maxAgeHours = body.maxAgeHours === null || body.maxAgeHours === 0
+        ? undefined
+        : Math.max(1, Math.floor(Number(body.maxAgeHours)));
+      feeds[index].maxAgeHours = maxAgeHours || undefined;
     }
     if (body.linkPrefix !== undefined) {
       feeds[index].linkPrefix = body.linkPrefix?.trim() || undefined;
@@ -172,6 +194,19 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     if (body.descriptionSelector !== undefined) {
       feeds[index].descriptionSelector = body.descriptionSelector?.trim() || undefined;
     }
+    if (body.decoupleFetchSend !== undefined) {
+      feeds[index].decoupleFetchSend = body.decoupleFetchSend;
+    }
+    
+    // Validate that interval doesn't exceed maxAgeHours if set
+    const currentInterval = feeds[index].intervalMinutes || 60;
+    const currentMaxAge = feeds[index].maxAgeHours;
+    if (currentMaxAge && currentInterval > currentMaxAge * 60) {
+      return jsonResponse({ 
+        error: `Check interval (${currentInterval} min) exceeds feed's max age (${currentMaxAge} hours). Items may be missed. Please set interval to ${currentMaxAge * 60} minutes or less.` 
+      }, 400);
+    }
+    
     feeds[index].updatedAt = new Date().toISOString();
     await saveFeeds(env, feeds);
     return jsonResponse({ feed: feeds[index] });
@@ -416,42 +451,156 @@ async function processFeeds(env: Env): Promise<JobResult> {
     };
   }
 
-  const feedsWithItems: FeedJobItem[] = [];
-  let totalNewItems = 0;
   const now = new Date();
-
+  
+  // First pass: identify feeds that are ready or within batching window
+  interface FeedReadiness {
+    feed: StoredFeed;
+    isReady: boolean;
+    minutesUntilReady: number;
+    groupKey: string;
+  }
+  
+  const feedReadiness: FeedReadiness[] = [];
+  
   for (const feed of feeds) {
-    // Check if enough time has passed since last run
-    const intervalMinutes = feed.intervalMinutes || 60; // Default to 60 minutes
-    if (feed.lastRunAt) {
-      const lastRun = new Date(feed.lastRunAt);
-      const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
-      if (minutesSinceLastRun < intervalMinutes) {
-        const minutesUntilNext = Math.ceil(intervalMinutes - minutesSinceLastRun);
-        feed.lastRunSummary = `Skipped (next check in ${minutesUntilNext} min)`;
-        continue; // Skip this feed, not enough time has passed
+    const intervalMinutes = feed.intervalMinutes || 60;
+    const decoupleFetchSend = feed.decoupleFetchSend || false;
+    const groupKey = feed.group?.trim() || "default";
+    
+    let isReady = false;
+    let minutesUntilReady = 0;
+    
+    if (decoupleFetchSend) {
+      // Decoupled: check if enough time has passed since last email send
+      if (!feed.lastRunAt) {
+        isReady = true;
+        minutesUntilReady = 0;
+      } else {
+        const lastRun = new Date(feed.lastRunAt);
+        const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+        if (minutesSinceLastRun >= intervalMinutes) {
+          isReady = true;
+          minutesUntilReady = 0;
+        } else {
+          minutesUntilReady = Math.ceil(intervalMinutes - minutesSinceLastRun);
+        }
+      }
+    } else {
+      // Normal: check if enough time has passed since last run
+      if (!feed.lastRunAt) {
+        isReady = true;
+        minutesUntilReady = 0;
+      } else {
+        const lastRun = new Date(feed.lastRunAt);
+        const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+        if (minutesSinceLastRun >= intervalMinutes) {
+          isReady = true;
+          minutesUntilReady = 0;
+        } else {
+          minutesUntilReady = Math.ceil(intervalMinutes - minutesSinceLastRun);
+        }
       }
     }
+    
+    feedReadiness.push({ feed, isReady, minutesUntilReady, groupKey });
+  }
+  
+  // Group feeds by group and identify which groups have ready feeds
+  const groupsWithReadyFeeds = new Set<string>();
+  for (const fr of feedReadiness) {
+    if (fr.isReady) {
+      groupsWithReadyFeeds.add(fr.groupKey);
+    }
+  }
+  
+  // Second pass: process feeds that are ready OR within batching window of a ready feed in same group
+  // Note: Decoupled feeds should only be included if they're actually ready (not just within window)
+  const feedsToProcess: FeedReadiness[] = [];
+  for (const fr of feedReadiness) {
+    if (fr.isReady) {
+      feedsToProcess.push(fr);
+    } else if (!fr.feed.decoupleFetchSend && groupsWithReadyFeeds.has(fr.groupKey) && fr.minutesUntilReady <= BATCHING_WINDOW_MINUTES) {
+      // This feed is within batching window of a ready feed in the same group
+      // Only include non-decoupled feeds (decoupled feeds should only send when fully ready)
+      feedsToProcess.push(fr);
+    }
+  }
 
-    const nowISO = now.toISOString();
+  const feedsWithItems: FeedJobItem[] = [];
+  let totalNewItems = 0;
+  const nowISO = now.toISOString();
+
+  for (const fr of feedsToProcess) {
+    const feed = fr.feed;
+    const intervalMinutes = feed.intervalMinutes || 60;
+    const decoupleFetchSend = feed.decoupleFetchSend || false;
+    const shouldSendEmail = fr.isReady;
+
+    // Fetch items for this feed
     try {
       const items = feed.isScrapedFeed 
         ? await scrapeFeedItems(feed)
         : await fetchFeedItems(feed.url);
       const newItems: ParsedItem[] = [];
+      const savedItems: ParsedItem[] = [];
+      
       for (const item of items) {
         const uniqueKey = await hashIdentifier(`${feed.id}:${item.id}`);
-        if (await env.FEEDS_KV.get(sentKey(feed.id, uniqueKey))) {
-          continue;
+        const sentKeyValue = sentKey(feed.id, uniqueKey);
+        
+        if (await env.FEEDS_KV.get(sentKeyValue)) {
+          continue; // Already processed
         }
-        newItems.push(item);
+        
+        // For decoupled feeds, save items immediately but only queue for email if interval is met
+        if (decoupleFetchSend) {
+          // Save to KV immediately to avoid missing items
+          await env.FEEDS_KV.put(sentKeyValue, "1", {
+            expirationTtl: SENT_TTL_SECONDS,
+          });
+          savedItems.push(item);
+          
+          // Only add to email queue if we should send email
+          if (shouldSendEmail) {
+            newItems.push(item);
+          }
+        } else {
+          // Normal behavior: if feed is in feedsToProcess, include items (either ready or batched)
+          // All feeds in feedsToProcess are either ready or within batching window
+          newItems.push(item);
+        }
       }
 
-      if (newItems.length) {
+      // Update lastFetchAt for decoupled feeds
+      if (decoupleFetchSend) {
+        feed.lastFetchAt = nowISO;
+        if (savedItems.length > 0 && !shouldSendEmail) {
+          // Calculate minutes until next email send
+          const lastRun = feed.lastRunAt ? new Date(feed.lastRunAt) : now;
+          const minutesSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60);
+          const minutesUntilNext = Math.ceil(intervalMinutes - minutesSinceLastRun);
+          feed.lastRunSummary = `Saved ${savedItems.length} new item(s), next email in ${minutesUntilNext} min`;
+        } else if (savedItems.length > 0 && shouldSendEmail) {
+          feed.lastRunSummary = `Saved ${savedItems.length} new item(s), queued for email`;
+        } else {
+          feed.lastRunSummary = "No new items";
+        }
+      }
+
+      // Add to email queue if we have items
+      // All feeds in feedsToProcess are either ready or within batching window, so include them
+      if (newItems.length > 0) {
         feedsWithItems.push({ feed, items: newItems });
         totalNewItems += newItems.length;
-        feed.lastRunSummary = `Queued ${newItems.length} new item(s)`;
-      } else {
+        if (!decoupleFetchSend) {
+          if (shouldSendEmail) {
+            feed.lastRunSummary = `Queued ${newItems.length} new item(s)`;
+          } else {
+            feed.lastRunSummary = `Queued ${newItems.length} new item(s) (batched)`;
+          }
+        }
+      } else if (!decoupleFetchSend && newItems.length === 0 && shouldSendEmail) {
         feed.lastRunSummary = "No new items";
       }
     } catch (error) {
@@ -460,6 +609,8 @@ async function processFeeds(env: Env): Promise<JobResult> {
       feed.lastRunSummary = `Failed: ${message}`;
       console.error(`Failed to fetch ${feed.url}`, error);
     } finally {
+      // Update lastRunAt when we actually send (or would send) email
+      // All feeds in feedsToProcess are included in the batch, so update lastRunAt
       feed.lastRunAt = nowISO;
     }
   }
@@ -483,13 +634,18 @@ async function processFeeds(env: Env): Promise<JobResult> {
         await sendDigestEmail(env, groupJobs, groupName);
         emailsSent++;
         for (const job of groupJobs) {
-          for (const item of job.items) {
-            const uniqueKey = await hashIdentifier(`${job.feed.id}:${item.id}`);
-            await env.FEEDS_KV.put(sentKey(job.feed.id, uniqueKey), "1", {
-              expirationTtl: SENT_TTL_SECONDS,
-            });
+          // For decoupled feeds, items are already saved to KV during fetch
+          // For normal feeds, save them now
+          if (!job.feed.decoupleFetchSend) {
+            for (const item of job.items) {
+              const uniqueKey = await hashIdentifier(`${job.feed.id}:${item.id}`);
+              await env.FEEDS_KV.put(sentKey(job.feed.id, uniqueKey), "1", {
+                expirationTtl: SENT_TTL_SECONDS,
+              });
+            }
           }
-          job.feed.lastRunSummary = `Sent ${job.items.length} new item(s)${groupName !== "default" ? ` (group: ${groupName})` : ""}`;
+          const batchedCount = groupJobs.length > 1 ? ` (${groupJobs.length} feeds batched)` : "";
+          job.feed.lastRunSummary = `Sent ${job.items.length} new item(s)${groupName !== "default" ? ` (group: ${groupName})` : ""}${batchedCount}`;
         }
       } catch (error) {
         emailsFailed++;

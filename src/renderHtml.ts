@@ -381,15 +381,15 @@ export function renderHtml({ feeds, recipient }: PageProps) {
             <input id="new-feed-group" name="group" placeholder="Tech, News, etc. (leave empty for default)" />
             <label for="new-feed-interval">Check interval (minutes)</label>
             <input id="new-feed-interval" name="intervalMinutes" type="number" min="1" value="60" placeholder="60" />
-            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-              <input type="checkbox" id="new-feed-decouple" name="decoupleFetchSend" />
-              <span>Decouple fetch and send (fetch frequently, send on interval)</span>
+            <label style="display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="new-feed-decouple" name="decoupleFetchSend" style="margin-top: 0.25rem; flex-shrink: 0;" />
+              <span style="line-height: 1.5;">Decouple fetch and send (fetch frequently, send on interval)</span>
             </label>
             <label for="new-feed-link-prefix">Link prefix (optional)</label>
             <input id="new-feed-link-prefix" name="linkPrefix" placeholder="https://archive.is/" />
-            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-              <input type="checkbox" id="new-feed-scraped" name="isScrapedFeed" />
-              <span>Scrape website (not RSS feed)</span>
+            <label style="display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="new-feed-scraped" name="isScrapedFeed" style="margin-top: 0.25rem; flex-shrink: 0;" />
+              <span style="line-height: 1.5;">Scrape website (not RSS feed)</span>
             </label>
             <div id="scraped-fields" style="display: none; margin-top: 0.75rem;">
               <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
@@ -748,17 +748,17 @@ export function renderHtml({ feeds, recipient }: PageProps) {
                   <label>Interval (min)</label>
                   <input data-field="intervalMinutes" type="number" min="1" value="\${feed.intervalMinutes || 60}" />
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
-                  <input type="checkbox" data-field="decoupleFetchSend" id="edit-feed-decouple-\${feed.id}" \${feed.decoupleFetchSend ? "checked" : ""} />
-                  <label for="edit-feed-decouple-\${feed.id}" style="margin:0;">Decouple fetch and send (fetch frequently, send on interval)</label>
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
+                  <input type="checkbox" data-field="decoupleFetchSend" id="edit-feed-decouple-\${feed.id}" \${feed.decoupleFetchSend ? "checked" : ""} style="margin-top:0.25rem;flex-shrink:0;" />
+                  <label for="edit-feed-decouple-\${feed.id}" style="margin:0;line-height:1.5;cursor:pointer;">Decouple fetch and send (fetch frequently, send on interval)</label>
                 </div>
                 <div>
                   <label>Link prefix</label>
                   <input data-field="linkPrefix" value="\${feed.linkPrefix || ""}" placeholder="https://archive.is/" />
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
-                  <input type="checkbox" data-field="isScrapedFeed" id="edit-feed-scraped-\${feed.id}" \${feed.isScrapedFeed ? "checked" : ""} />
-                  <label for="edit-feed-scraped-\${feed.id}" style="margin:0;">Scrape website (not RSS feed)</label>
+                <div style="display:flex;align-items:flex-start;gap:0.5rem;grid-column:1/-1;margin-top:0.5rem;">
+                  <input type="checkbox" data-field="isScrapedFeed" id="edit-feed-scraped-\${feed.id}" \${feed.isScrapedFeed ? "checked" : ""} style="margin-top:0.25rem;flex-shrink:0;" />
+                  <label for="edit-feed-scraped-\${feed.id}" style="margin:0;line-height:1.5;cursor:pointer;">Scrape website (not RSS feed)</label>
                 </div>
                 <div class="scraped-edit-fields" style="display: \${feed.isScrapedFeed ? "grid" : "none"}; grid-column: 1 / -1; margin-top: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
                   <div style="grid-column: 1 / -1;">

@@ -369,7 +369,7 @@ export function renderHtml({ feeds, recipient, settings }: PageProps) {
           <h2>Settings</h2>
           <form id="settings-form">
             <label for="batching-window">Batching window (minutes)</label>
-            <input id="batching-window" name="batchingWindowMinutes" type="number" min="1" value="\${settings?.batchingWindowMinutes || 60}" placeholder="60" />
+            <input id="batching-window" name="batchingWindowMinutes" type="number" min="1" value="${settings?.batchingWindowMinutes || 60}" placeholder="60" />
             <p class="subtext" style="margin-top:0.5rem;">Feeds in the same group that are ready within this window will be batched together in one email.</p>
             <button class="primary" type="submit">Save settings</button>
             <p id="settings-status" class="subtext" style="margin-top:0.75rem;"></p>
@@ -470,6 +470,12 @@ export function renderHtml({ feeds, recipient, settings }: PageProps) {
       };
 
       const toast = document.getElementById("toast");
+
+      // Initialize settings form with current values
+      const batchingWindowInput = document.getElementById("batching-window");
+      if (batchingWindowInput && state.settings?.batchingWindowMinutes) {
+        batchingWindowInput.value = state.settings.batchingWindowMinutes;
+      }
 
       // Toggle scraped fields visibility
       document.getElementById("new-feed-scraped").addEventListener("change", (event) => {

@@ -21,10 +21,12 @@ export interface FeedPageDataFeed {
 interface PageProps {
   feeds: FeedPageDataFeed[];
   recipient: string;
+  settings?: { batchingWindowMinutes?: number };
 }
 
-export function renderHtml({ feeds, recipient }: PageProps) {
+export function renderHtml({ feeds, recipient, settings }: PageProps) {
   const initialFeeds = JSON.stringify(feeds).replace(/</g, "\\u003c");
+  const initialSettings = JSON.stringify(settings || {}).replace(/</g, "\\u003c");
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -364,6 +366,17 @@ export function renderHtml({ feeds, recipient }: PageProps) {
 
       <div class="grid">
         <section class="panel">
+          <h2>Settings</h2>
+          <form id="settings-form">
+            <label for="batching-window">Batching window (minutes)</label>
+            <input id="batching-window" name="batchingWindowMinutes" type="number" min="1" value="\${settings?.batchingWindowMinutes || 60}" placeholder="60" />
+            <p class="subtext" style="margin-top:0.5rem;">Feeds in the same group that are ready within this window will be batched together in one email.</p>
+            <button class="primary" type="submit">Save settings</button>
+            <p id="settings-status" class="subtext" style="margin-top:0.75rem;"></p>
+          </form>
+        </section>
+
+        <section class="panel">
           <h2>Manual run</h2>
           <p>Fetch every feed and send a digest right now.</p>
           <button class="primary" id="run-now">Run job</button>
@@ -453,6 +466,7 @@ export function renderHtml({ feeds, recipient }: PageProps) {
     <script>
       const state = {
         feeds: ${initialFeeds},
+        settings: ${initialSettings},
       };
 
       const toast = document.getElementById("toast");
@@ -641,6 +655,31 @@ export function renderHtml({ feeds, recipient }: PageProps) {
       });
 
       document.getElementById("refresh-feeds").addEventListener("click", refreshFeeds);
+      
+      document.getElementById("settings-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const statusEl = document.getElementById("settings-status");
+        statusEl.textContent = "Saving…";
+        try {
+          const response = await fetch("/api/settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              batchingWindowMinutes: Number(form.batchingWindowMinutes.value),
+            }),
+          });
+          if (!response.ok) throw await response.json();
+          statusEl.textContent = "Settings saved.";
+          showToast("Settings saved.");
+          const data = await response.json();
+          state.settings = data.settings;
+        } catch (error) {
+          statusEl.textContent = "Failed to save settings.";
+          handleError(error, "Failed to save settings.");
+        }
+      });
+
       document.getElementById("run-now").addEventListener("click", async () => {
         const statusEl = document.getElementById("run-status");
         statusEl.textContent = "Running job…";

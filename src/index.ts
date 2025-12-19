@@ -49,7 +49,8 @@ interface JobResult {
 const FEEDS_KEY = "feeds:list";
 const SENT_PREFIX = "sent:";
 const SENT_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
-const BATCHING_WINDOW_MINUTES = 60; // Batch feeds in same group if they're ready within this window
+const SETTINGS_KEY = "settings";
+const DEFAULT_BATCHING_WINDOW_MINUTES = 60; // Default batching window
 
 export default {
   async fetch(request, env, ctx) {
@@ -77,11 +78,17 @@ export default {
       return jsonResponse(result);
     }
 
+    if (pathname.startsWith("/api/settings")) {
+      return handleSettingsApi(request, env, pathname);
+    }
+
     const feeds = await listFeeds(env);
+    const settings = await getSettings(env);
     return new Response(
       renderHtml({
         feeds,
         recipient: env.MAILTRAP_RECIPIENT,
+        settings,
       }),
       {
         headers: {
@@ -216,6 +223,27 @@ async function handleFeedApi(request: Request, env: Env, pathname: string) {
     const [removed] = feeds.splice(index, 1);
     await saveFeeds(env, feeds);
     return jsonResponse({ deleted: removed?.id ?? null });
+  }
+
+  return jsonResponse({ error: "Method Not Allowed" }, 405);
+}
+
+async function handleSettingsApi(request: Request, env: Env, pathname: string) {
+  const method = request.method.toUpperCase();
+
+  if (method === "GET" && pathname === "/api/settings") {
+    const settings = await getSettings(env);
+    return jsonResponse({ settings });
+  }
+
+  if (method === "PUT" && pathname === "/api/settings") {
+    const body = (await readJson<{ batchingWindowMinutes?: number }>(request)) ?? {};
+    if (body.batchingWindowMinutes !== undefined) {
+      const batchingWindow = Math.max(1, Math.floor(Number(body.batchingWindowMinutes)));
+      await saveSettings(env, { batchingWindowMinutes: batchingWindow });
+      return jsonResponse({ settings: { batchingWindowMinutes: batchingWindow } });
+    }
+    return jsonResponse({ error: "batchingWindowMinutes is required" }, 400);
   }
 
   return jsonResponse({ error: "Method Not Allowed" }, 405);
@@ -452,6 +480,7 @@ async function processFeeds(env: Env): Promise<JobResult> {
   }
 
   const now = new Date();
+  const batchingWindow = await getBatchingWindow(env);
   
   // First pass: identify feeds that are ready or within batching window
   interface FeedReadiness {
@@ -520,7 +549,7 @@ async function processFeeds(env: Env): Promise<JobResult> {
   for (const fr of feedReadiness) {
     if (fr.isReady) {
       feedsToProcess.push(fr);
-    } else if (!fr.feed.decoupleFetchSend && groupsWithReadyFeeds.has(fr.groupKey) && fr.minutesUntilReady <= BATCHING_WINDOW_MINUTES) {
+    } else if (!fr.feed.decoupleFetchSend && groupsWithReadyFeeds.has(fr.groupKey) && fr.minutesUntilReady <= batchingWindow) {
       // This feed is within batching window of a ready feed in the same group
       // Only include non-decoupled feeds (decoupled feeds should only send when fully ready)
       feedsToProcess.push(fr);
@@ -1019,6 +1048,27 @@ async function listFeeds(env: Env): Promise<StoredFeed[]> {
 
 async function saveFeeds(env: Env, feeds: StoredFeed[]) {
   await env.FEEDS_KV.put(FEEDS_KEY, JSON.stringify(feeds));
+}
+
+interface Settings {
+  batchingWindowMinutes?: number;
+}
+
+async function getSettings(env: Env): Promise<Settings> {
+  const data = await env.FEEDS_KV.get(SETTINGS_KEY, "json");
+  if (!data || typeof data !== "object") {
+    return { batchingWindowMinutes: DEFAULT_BATCHING_WINDOW_MINUTES };
+  }
+  return data as Settings;
+}
+
+async function saveSettings(env: Env, settings: Settings) {
+  await env.FEEDS_KV.put(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+async function getBatchingWindow(env: Env): Promise<number> {
+  const settings = await getSettings(env);
+  return settings.batchingWindowMinutes ?? DEFAULT_BATCHING_WINDOW_MINUTES;
 }
 
 async function readJson<T>(request: Request): Promise<T | null> {
